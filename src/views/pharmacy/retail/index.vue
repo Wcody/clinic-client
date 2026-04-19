@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
-import { ElMessage } from "element-plus";
-import Refresh from "@iconify-icons/ep/refresh";
+import { ref, reactive, onMounted, nextTick, watch } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import Delete from "@iconify-icons/ep/delete";
-import ArrowDown from "@iconify-icons/ep/arrow-down";
-import { IconifyIconOffline, IconifyIconOnline } from "@pureadmin/utils";
 import { PureTableBar } from "@/components/RePureTableBar";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { deviceDetection } from "@pureadmin/utils";
-import { useWindowSize } from "@vueuse/core";
 import PureTable from "@pureadmin/table";
+import BqMedicineSelector from "@/components/BqMedicineSelector";
+import BqPatientBasicInfo from "@/components/BqPatientBasicInfo";
+import RetailDetailDialog from "./comp/RetailDetailDialog.vue";
+import { retailSaveApi, getDrugSalesPageApi } from "@/api/pharmacy/sales";
+import { addPatientApi } from "@/api/cm/patient";
 
 defineOptions({
-  name: "VisitList"
+  name: "PharmacyRetail"
 });
 
 const tableRef = ref();
@@ -20,238 +21,116 @@ const contentRef = ref();
 const queryFormRef = ref();
 const activeTab = ref("pending");
 
+// 药品选择器 ref
+const medicineSelectorRef = ref<{ focus: () => void }>();
+// 数量输入框 ref 列表（与 retailForm.items 索引对应）
+const quantityInputRefs = ref<any[]>([]);
+const setQuantityRef = (el: any, index: number) => {
+  if (el) quantityInputRefs.value[index] = el;
+};
+
 // 动态计算表格底部偏移量
-const { height: windowHeight } = useWindowSize();
 const tableOffsetBottom = ref(110);
 
-// 监听容器高度变化，动态计算 offsetBottom
 const updateOffsetBottom = () => {
-  const viewportHeight = windowHeight.value;
-
   if (activeTab.value !== "diagnosed") {
     tableOffsetBottom.value = 110;
     return;
   }
-
   nextTick(() => {
     const headerHeight = 55;
     const searchFormEl = queryFormRef.value?.$el;
     const searchHeight = searchFormEl?.offsetHeight || 60;
     const paginationHeight = 50;
     const spacing = 24;
-
-    const currentOffset =
+    tableOffsetBottom.value =
       headerHeight + searchHeight + paginationHeight + spacing;
-    tableOffsetBottom.value = currentOffset;
   });
 };
 
-// 监听标签页切换
 const handleTabChange = () => {
-  setTimeout(() => {
-    updateOffsetBottom();
-  }, 200);
+  setTimeout(() => updateOffsetBottom(), 200);
   handleQuery();
+};
+
+// ==================== 患者信息 ====================
+const patientBasicInfoRef = ref();
+const isPatientInfoCollapsed = ref(false);
+
+// 选中患者的数据库 ID（Integer），提交时写入 patientId 字段
+const selectedPatientId = ref<number | null>(null);
+
+const togglePatientInfo = () => {
+  isPatientInfoCollapsed.value = !isPatientInfoCollapsed.value;
+};
+
+const handlePatientSelect = (user: any) => {
+  selectedPatientId.value = user.id ? Number(user.id) : null;
+  ElMessage.success(`已选择患者：${user.name}`);
+};
+
+const handlePatientSave = (formData: any) => {
+  // 保存患者信息时，更新选中的患者ID
+  if (formData.id) {
+    selectedPatientId.value = Number(formData.id);
+  }
+  ElMessage.success("患者信息已保存");
 };
 
 // ==================== 新增零售 ====================
 const retailForm = reactive({
   patientId: "",
   patientName: "",
-  items: [
-    {
-      drugId: "",
-      drugName: "白葡奈氏菌片",
-      specification: "0.3mg*40片/盒",
-      manufacturer: "山东齐鲁药业",
-      unitPrice: 1.20,
-      quantity: "",
-      unit: "片",
-      amount: 0,
-      showDrugSelect: false
-    }
-  ]
+  items: [] as Array<{
+    drugId: string;
+    drugName: string;
+    specification: string;
+    manufacturer: string;
+    unitPrice: number;
+    quantity: string;
+    unit: string;
+    amount: number;
+  }>
 });
 
-// 药品选择相关数据
-const drugSearchText = ref("");
-const currentSelectItem = ref(null);
-const addDrugPopoverVisible = ref(false);
-const addDrugInputText = ref(""); // 添加药品输入框文本
+const addDrugInputText = ref("");
 
-// 药品筛选条件
-const drugFilters = reactive({
-  showOwnDrug: true,
-  showWestern: false,
-  showChinese: false,
-  showExam: false,
-  showTreatment: false,
-  showAdditional: false
-});
-
-// 药品表格数据
-const drugTableData = ref([
-  {
-    id: "1",
-    name: "白葡奈氏菌片",
-    specification: "0.3mg*40片/盒",
-    manufacturer: "山东齐鲁药业",
-    stock: "70盒0.00片",
-    price: "1.20元/片",
-    source: "我的药库",
-    unitPrice: 1.20,
-    unit: "片"
-  },
-  {
-    id: "2",
-    name: "阿莫西林胶囊",
-    specification: "0.5g*24粒/盒",
-    manufacturer: "",
-    stock: "3盒0.00粒",
-    price: "3.00元/粒",
-    source: "我的药库",
-    unitPrice: 3.00,
-    unit: "粒"
-  },
-  {
-    id: "3",
-    name: "化风丹",
-    specification: "0.12g*90丸/盒",
-    manufacturer: "贵州万胜药业有限责任公司",
-    stock: "12盒0.00丸",
-    price: "128.00元/盒",
-    source: "我的药库",
-    unitPrice: 128.00,
-    unit: "盒"
-  },
-  {
-    id: "4",
-    name: "龙脑安神丸",
-    specification: "每丸重5g",
-    manufacturer: "吉林恒金药业股份有限公司",
-    stock: "0盒0.00粒",
-    price: "200.00元/粒",
-    source: "我的药库",
-    unitPrice: 200.00,
-    unit: "粒"
-  },
-  {
-    id: "5",
-    name: "清浊祛毒丸",
-    specification: "8g*9袋/盒",
-    manufacturer: "广西清之品制药有限责任公司",
-    stock: "2盒0.00袋",
-    price: "5.00元/袋",
-    source: "我的药库",
-    unitPrice: 5.00,
-    unit: "袋"
-  }
-]);
-
-// 药品分页
-const drugPagination = reactive({
-  currentPage: 1,
-  pageSize: 20,
-  total: 2079
-});
-
-// 打开药品选择
-const openDrugSelect = (item) => {
-  currentSelectItem.value = item;
-  drugSearchText.value = "";
-  loadDrugList();
-};
-
-// 加载药品列表
-const loadDrugList = () => {
-  // TODO: 调用接口获取药品列表
-  // getDrugPage({
-  //   keyword: drugSearchText.value,
-  //   showOwnDrug: drugFilters.showOwnDrug,
-  //   showWestern: drugFilters.showWestern,
-  //   showChinese: drugFilters.showChinese,
-  //   showExam: drugFilters.showExam,
-  //   showTreatment: drugFilters.showTreatment,
-  //   showAdditional: drugFilters.showAdditional,
-  //   currentPage: drugPagination.currentPage,
-  //   pageSize: drugPagination.pageSize
-  // }).then(res => {
-  //   drugTableData.value = res.data.list;
-  //   drugPagination.total = res.data.total;
-  // });
-};
-
-// 药品搜索
-const handleDrugSearch = () => {
-  drugPagination.currentPage = 1;
-  loadDrugList();
-};
-
-// 选择药品
-const handleSelectDrug = (row) => {
-  if (currentSelectItem.value) {
-    currentSelectItem.value.drugId = row.id;
-    currentSelectItem.value.drugName = row.name;
-    currentSelectItem.value.specification = row.specification;
-    currentSelectItem.value.manufacturer = row.manufacturer;
-    currentSelectItem.value.unitPrice = row.unitPrice;
-    currentSelectItem.value.unit = row.unit;
-    currentSelectItem.value.amount = 0;
-    currentSelectItem.value.quantity = "";
-    // 关闭面板
-    currentSelectItem.value.showDrugSelect = false;
-  }
-};
-
-// 打开添加药品选择
-const openAddDrugSelect = () => {
-  addDrugInputText.value = "";
-  drugPagination.currentPage = 1;
-  loadDrugList();
-};
-
-// 选择药品（添加药品行）
-const handleAddDrugSelect = (row) => {
-  addDrugItem();
-  const newItem = retailForm.items[retailForm.items.length - 1];
-  newItem.drugId = row.id;
-  newItem.drugName = row.name;
-  newItem.specification = row.specification;
-  newItem.manufacturer = row.manufacturer;
-  newItem.unitPrice = row.unitPrice;
-  newItem.unit = row.unit;
-  newItem.amount = 0;
-  newItem.quantity = "";
-  // 清空输入框并关闭面板
-  addDrugInputText.value = "";
-  addDrugPopoverVisible.value = false;
-};
-
-// 计算总金额
-const getTotalAmount = () => {
-  return retailForm.items.reduce((sum, item) => {
-    const qty = parseFloat(item.quantity) || 0;
-    const price = parseFloat(item.unitPrice) || 0;
-    return sum + qty * price;
-  }, 0);
-};
-
-// 添加药品行
-const addDrugItem = () => {
+const handleAddDrugSelect = (medicine: any) => {
   retailForm.items.push({
-    drugId: "",
-    drugName: "",
-    specification: "",
-    manufacturer: "",
-    unitPrice: 0,
+    drugId: medicine.id ?? "",
+    drugName: medicine.name ?? "",
+    specification: medicine.spec ?? medicine.specification ?? "",
+    manufacturer: medicine.manufacturer ?? "",
+    unitPrice: parseFloat(medicine.price ?? medicine.prescriptionPrice) || 0,
     quantity: "",
     unit: "片",
-    amount: 0,
-    showDrugSelect: false
+    amount: 0
+  });
+
+  // 清空药品选择器输入框
+  nextTick(() => {
+    addDrugInputText.value = "";
+  });
+
+  // 跳转到新增行的数量输入框
+  const newIndex = retailForm.items.length - 1;
+  nextTick(() => {
+    quantityInputRefs.value[newIndex]?.focus();
   });
 };
 
-// 删除药品行
+// 数量框回车：焦点回到药品选择器
+const handleQuantityEnter = () => {
+  nextTick(() => {
+    medicineSelectorRef.value?.focus();
+  });
+};
+
+const getTotalAmount = () =>
+  retailForm.items.reduce((sum, item) => {
+    return sum + (parseFloat(item.quantity) || 0) * (item.unitPrice || 0);
+  }, 0);
+
 const removeDrugItem = (index: number) => {
   if (retailForm.items.length > 1) {
     retailForm.items.splice(index, 1);
@@ -260,111 +139,242 @@ const removeDrugItem = (index: number) => {
   }
 };
 
-// 计算单项金额
 const calculateItemAmount = (item: any) => {
-  const qty = parseFloat(item.quantity) || 0;
-  const price = parseFloat(item.unitPrice) || 0;
-  item.amount = qty * price;
+  item.amount =
+    (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
+};
+
+const saving = ref(false);
+
+// 构建零售保存参数（主记录 + 明细列表）
+const buildRetailPayload = (charged: boolean) => {
+  const total = getTotalAmount();
+  // 获取患者基本信息
+  const patientForm = patientBasicInfoRef.value?.form;
+
+  const sales = {
+    patientId: selectedPatientId.value || undefined,
+    patientName: patientForm?.name || undefined,
+    gender: patientForm?.gender || undefined,
+    firstAge: patientForm?.firstAge || undefined,
+    lastAge: patientForm?.lastAge || undefined,
+    ageType: patientForm?.ageType || undefined,
+    idCard: patientForm?.idCard || undefined,
+    mobile: patientForm?.mobile || undefined,
+    province: patientForm?.province || undefined,
+    city: patientForm?.city || undefined,
+    district: patientForm?.district || undefined,
+    address: patientForm?.address || undefined,
+    isFirstVisit: patientForm?.isFirstVisit || undefined,
+    isAllergy: patientForm?.isAllergy || undefined,
+    allergicHistory: patientForm?.allergicHistory || undefined,
+    amount: total.toFixed(2),
+    actualAmount: charged ? total.toFixed(2) : "0.00",
+    status: charged ? 1 : 0,
+    statusRemark: charged ? "已收费" : "未收费"
+  };
+
+  const items = retailForm.items.map(i => ({
+    drugId: i.drugId || undefined,
+    drugName: i.drugName,
+    specification: i.specification || undefined,
+    manufacturer: i.manufacturer || undefined,
+    unitPrice: String(i.unitPrice),
+    quantity: String(i.quantity),
+    unit: i.unit,
+    amount: i.amount.toFixed(2)
+  }));
+
+  return { sales, items };
+};
+
+// 构建患者保存参数（从基本信息组件表单转换）
+const buildPatientPayload = () => {
+  const patientForm = patientBasicInfoRef.value?.form;
+  if (!patientForm) return null;
+
+  // 计算年龄字符串（根据年龄三段式组合）
+  let ageStr = "";
+  if (patientForm.ageType === 1) {
+    // 岁
+    ageStr = `${patientForm.firstAge}岁`;
+    if (patientForm.lastAge > 0) {
+      ageStr += `${patientForm.lastAge}月`;
+    }
+  } else if (patientForm.ageType === 2) {
+    // 月
+    ageStr = `${patientForm.firstAge}月`;
+    if (patientForm.lastAge > 0) {
+      ageStr += `${patientForm.lastAge}天`;
+    }
+  } else if (patientForm.ageType === 3) {
+    // 天
+    ageStr = `${patientForm.firstAge}天`;
+  }
+
+  return {
+    name: patientForm.name || "",
+    gender: patientForm.gender || "男",
+    age: ageStr,
+    mobile: patientForm.mobile || "",
+    idCard: patientForm.idCard || "",
+    province: patientForm.province || undefined,
+    city: patientForm.city || undefined,
+    district: patientForm.district || undefined,
+    address: patientForm.address || "",
+    firstAge: patientForm.firstAge || 0,
+    lastAge: patientForm.lastAge || 0,
+    ageType: patientForm.ageType || 1,
+    isAllergy: patientForm.isAllergy || false,
+    allergicHistory: patientForm.allergicHistory || ""
+  };
 };
 
 // 保存零售记录
-const handleSaveRetail = () => {
-  // 验证必填项
-  const hasEmptyItem = retailForm.items.some(
-    item => !item.drugName || !item.quantity
-  );
-  if (hasEmptyItem) {
+const handleSaveRetail = async () => {
+  // 校验患者信息
+  const patientValid = patientBasicInfoRef.value?.validate();
+  if (!patientValid) {
+    ElMessage.error("请先完善患者基本信息");
+    // 如果面板是折叠状态，自动展开以便用户看到错误
+    if (isPatientInfoCollapsed.value) {
+      isPatientInfoCollapsed.value = false;
+    }
+    return;
+  }
+
+  // 校验药品信息
+  if (retailForm.items.length === 0) {
+    ElMessage.warning("请至少添加一种药品");
+    return;
+  }
+  const hasEmpty = retailForm.items.some(i => !i.drugName || !i.quantity);
+  if (hasEmpty) {
     ElMessage.warning("请填写完整的药品信息");
     return;
   }
 
-  // TODO: 调用保存接口
-  ElMessage.success("保存成功");
+  saving.value = true;
+  try {
+    // 如果患者ID为空，先保存患者信息
+    if (!selectedPatientId.value) {
+      const patientPayload = buildPatientPayload();
+      if (patientPayload) {
+        const patientRes = await addPatientApi(patientPayload);
+        if (patientRes.code === 0) {
+          // 更新选中的患者ID（后端可能返回id或eid）
+          const newPatientId = patientRes.data.id;
+          selectedPatientId.value = newPatientId;
+          // 更新基本信息组件中的患者ID
+          if (patientBasicInfoRef.value && newPatientId) {
+            patientBasicInfoRef.value.form.id = newPatientId;
+          }
+          ElMessage.success("患者信息已保存");
+        } else {
+          ElMessage.error("保存患者信息失败：" + patientRes.errMsg);
+          return;
+        }
+      }
+    }
+
+    // 保存零售记录
+    await retailSaveApi(buildRetailPayload(false));
+    ElMessage.success("保存成功");
+    resetRetailForm();
+  } catch (error) {
+    console.error("保存失败:", error);
+    ElMessage.error("保存失败，请重试");
+  } finally {
+    saving.value = false;
+  }
 };
 
 // 收费
-const handleChargeRetail = () => {
-  // 验证必填项
-  const hasEmptyItem = retailForm.items.some(
-    item => !item.drugName || !item.quantity
-  );
-  if (hasEmptyItem) {
+const handleChargeRetail = async () => {
+  // 校验患者信息
+  const patientValid = patientBasicInfoRef.value?.validate();
+  if (!patientValid) {
+    ElMessage.error("请先完善患者基本信息");
+    // 如果面板是折叠状态，自动展开以便用户看到错误
+    if (isPatientInfoCollapsed.value) {
+      isPatientInfoCollapsed.value = false;
+    }
+    return;
+  }
+
+  // 校验药品信息
+  if (retailForm.items.length === 0) {
+    ElMessage.warning("请至少添加一种药品");
+    return;
+  }
+  const hasEmpty = retailForm.items.some(i => !i.drugName || !i.quantity);
+  if (hasEmpty) {
     ElMessage.warning("请填写完整的药品信息");
     return;
   }
 
-  // TODO: 调用收费接口
-  ElMessage.success("收费成功");
+  saving.value = true;
+  try {
+    // 如果患者ID为空，先保存患者信息
+    if (!selectedPatientId.value) {
+      const patientPayload = buildPatientPayload();
+      if (patientPayload) {
+        const patientRes = await addPatientApi(patientPayload);
+        // 更新选中的患者ID（后端可能返回id或eid）
+        const newPatientId =
+          (patientRes.data as any)?.id ??
+          (patientRes.data as any)?.patientId ??
+          null;
+        selectedPatientId.value = newPatientId;
+        // 更新基本信息组件中的患者ID
+        if (patientBasicInfoRef.value && newPatientId) {
+          patientBasicInfoRef.value.form.id = newPatientId;
+        }
+        ElMessage.success("患者信息已保存");
+      }
+    }
+
+    // 保存零售记录（直接收费）
+    await retailSaveApi(buildRetailPayload(true));
+    ElMessage.success("收费成功");
+    resetRetailForm();
+  } catch (error) {
+    console.error("收费失败:", error);
+    ElMessage.error("收费失败，请重试");
+  } finally {
+    saving.value = false;
+  }
 };
 
-// 打开患者信息输入
-const handleInputPatientInfo = () => {
-  ElMessage.info("打开患者信息输入对话框");
+// 重置表单
+const resetRetailForm = () => {
+  retailForm.items = [];
+  addDrugInputText.value = "";
+  selectedPatientId.value = null;
+  // 重置患者基本信息组件
+  patientBasicInfoRef.value?.reset();
 };
 
 // ==================== 零售记录 ====================
 const retailRecordQueryForm = reactive({
-  patientName: "",
-  dateRange: ["", ""]
+  status: "",
+  keyword: "",
+  startTime: "",
+  endTime: ""
 });
 
-const retailRecordColumns = ref([
-  { label: "销售ID", prop: "id", minWidth: 120 },
-  { label: "金额", prop: "amount", minWidth: 120 },
-  { label: "实收金额", prop: "actualAmount", minWidth: 120 },
-  { label: "操作人", prop: "operatorPerson", minWidth: 120 },
-  { label: "创建时间", prop: "created", minWidth: 180 },
-  { label: "状态", prop: "status", minWidth: 100 },
-  { label: "操作", fixed: "right", width: 150, slot: "retailRecordOperation" }
+const retailRecordColumns = ref<any[]>([
+  { label: "患者姓名", prop: "patientName", minWidth: 100 },
+  { label: "金额", prop: "amount", minWidth: 100 },
+  { label: "实收金额", prop: "actualAmount", minWidth: 100 },
+  { label: "操作人", prop: "createdBy", minWidth: 100 },
+  { label: "创建时间", prop: "createdTime", minWidth: 170 },
+  { label: "状态", prop: "status", minWidth: 90, slot: "status" },
+  { label: "操作", fixed: "right", width: 80, slot: "retailRecordOperation" }
 ]);
 
-const retailRecordList = ref([
-  {
-    id: "10001",
-    amount: "120.00",
-    actualAmount: "120.00",
-    operatorPerson: "张三",
-    created: "2026-04-11 17:01:05",
-    status: 1,
-    statusRemark: "已收费"
-  },
-  {
-    id: "10002",
-    amount: "85.50",
-    actualAmount: "85.50",
-    operatorPerson: "李四",
-    created: "2026-04-11 16:59:25",
-    status: 1,
-    statusRemark: "已收费"
-  },
-  {
-    id: "10003",
-    amount: "200.00",
-    actualAmount: "0.00",
-    operatorPerson: "王五",
-    created: "2026-04-11 16:52:47",
-    status: 0,
-    statusRemark: "未收费"
-  },
-  {
-    id: "10004",
-    amount: "500.00",
-    actualAmount: "500.00",
-    operatorPerson: "张三",
-    created: "2026-04-11 15:30:00",
-    status: 1,
-    statusRemark: "已收费"
-  },
-  {
-    id: "10005",
-    amount: "300.00",
-    actualAmount: "0.00",
-    operatorPerson: "赵六",
-    created: "2026-04-11 14:20:00",
-    status: 0,
-    statusRemark: "未收费"
-  }
-]);
+const retailRecordList = ref<any[]>([]);
+const retailRecordLoading = ref(false);
 
 const retailRecordPagination = reactive({
   currentPage: 1,
@@ -373,44 +383,49 @@ const retailRecordPagination = reactive({
 });
 
 // ==================== 方法 ====================
-// 查询数据
 const handleQuery = () => {
-  if (activeTab.value === "pending") {
-    // 新增零售页签，无需查询
-  } else {
-    // 查询零售记录
+  if (activeTab.value === "diagnosed") {
     loadRetailRecords();
   }
 };
 
-// 加载零售记录
-const loadRetailRecords = () => {
-  // TODO: 调用接口获取零售记录
-  // getSalePage({
-  //   currentPage: retailRecordPagination.currentPage,
-  //   pageSize: retailRecordPagination.pageSize,
-  //   ...retailRecordQueryForm
-  // }).then(res => {
-  //   retailRecordList.value = res.data.list;
-  //   retailRecordPagination.total = res.data.total;
-  // });
+const loadRetailRecords = async () => {
+  retailRecordLoading.value = true;
+  try {
+    const res = await getDrugSalesPageApi({
+      current: retailRecordPagination.currentPage,
+      size: retailRecordPagination.pageSize,
+      status:
+        retailRecordQueryForm.status !== ""
+          ? retailRecordQueryForm.status
+          : undefined,
+      patientName: retailRecordQueryForm.keyword || undefined,
+      startTime: retailRecordQueryForm.startTime || undefined,
+      endTime: retailRecordQueryForm.endTime || undefined
+    });
+    retailRecordList.value = res.data?.records ?? [];
+    retailRecordPagination.total = Number(res.data?.total ?? 0);
+  } catch {
+    ElMessage.error("加载零售记录失败");
+  } finally {
+    retailRecordLoading.value = false;
+  }
 };
 
-// 查询
 const handleSearch = () => {
   retailRecordPagination.currentPage = 1;
   loadRetailRecords();
 };
 
-// 重置查询
 const handleResetQuery = () => {
-  retailRecordQueryForm.patientName = "";
-  retailRecordQueryForm.dateRange = ["", ""];
+  retailRecordQueryForm.status = "";
+  retailRecordQueryForm.keyword = "";
+  retailRecordQueryForm.startTime = "";
+  retailRecordQueryForm.endTime = "";
   retailRecordPagination.currentPage = 1;
   loadRetailRecords();
 };
 
-// 分页改变 - 零售记录
 const handleRetailRecordPageChange = (page: number) => {
   retailRecordPagination.currentPage = page;
   loadRetailRecords();
@@ -421,17 +436,18 @@ const handleRetailRecordSizeChange = (size: number) => {
   loadRetailRecords();
 };
 
-// 查看零售记录详情
+// ==================== 详情面板 ====================
+const detailPanelVisible = ref(false);
+const currentDetailData = ref<any>(null);
+
 const handleViewRetailDetail = (row: any) => {
-  ElMessage.info(`查看零售记录详情: ${row.id}`);
+  currentDetailData.value = row;
+  detailPanelVisible.value = true;
 };
 
-// 删除零售记录
-const handleDeleteRetail = (row: any) => {
-  ElMessage.warning(`删除零售记录: ${row.id}`);
-};
+// ==================== 详情对话框 ====================
+const detailDialogVisible = ref(false);
 
-// Lifecycle
 onMounted(() => {
   handleQuery();
 });
@@ -449,11 +465,21 @@ onMounted(() => {
       <el-tab-pane label="新增零售" name="pending">
         <div class="tab-content">
           <div class="retail-form-container">
-            <!-- 顶部操作栏 -->
-            <div class="retail-header">
-              <el-button type="primary" @click="handleInputPatientInfo">
-                输入患者信息
-              </el-button>
+            <!-- 患者基本信息组件（可折叠） -->
+            <div class="patient-info-wrapper">
+              <transition name="collapse-transition">
+                <div
+                  v-show="!isPatientInfoCollapsed"
+                  class="patient-info-content"
+                >
+                  <BqPatientBasicInfo
+                    ref="patientBasicInfoRef"
+                    :show-allergy="false"
+                    @user-select="handlePatientSelect"
+                    @save="handlePatientSave"
+                  />
+                </div>
+              </transition>
             </div>
 
             <!-- 药品表格 -->
@@ -474,7 +500,9 @@ onMounted(() => {
                 <tbody>
                   <tr v-for="(item, index) in retailForm.items" :key="index">
                     <td>
-                      <span class="drug-name-text">{{ item.drugName || '请选择药品' }}</span>
+                      <span class="drug-name-text">{{
+                        item.drugName || "请选择药品"
+                      }}</span>
                     </td>
                     <td>
                       <span class="text-cell">{{ item.specification }}</span>
@@ -493,11 +521,13 @@ onMounted(() => {
                     </td>
                     <td>
                       <el-input
+                        :ref="(el: any) => setQuantityRef(el, index)"
                         v-model="item.quantity"
                         type="number"
                         placeholder=""
                         class="quantity-input"
                         @input="calculateItemAmount(item)"
+                        @keydown.enter.prevent="handleQuantityEnter"
                       />
                     </td>
                     <td>
@@ -510,7 +540,9 @@ onMounted(() => {
                       </el-select>
                     </td>
                     <td>
-                      <span class="amount-cell">{{ item.amount.toFixed(2) }}</span>
+                      <span class="amount-cell">{{
+                        item.amount.toFixed(2)
+                      }}</span>
                     </td>
                     <td>
                       <el-button
@@ -525,78 +557,12 @@ onMounted(() => {
                   <!-- 添加药品行 -->
                   <tr>
                     <td colspan="8">
-                      <el-popover
-                        v-model:visible="addDrugPopoverVisible"
-                        placement="bottom-start"
-                        :width="1100"
-                        trigger="click"
-                      >
-                        <template #reference>
-                          <el-input
-                            v-model="addDrugInputText"
-                            placeholder="请选择药品"
-                            clearable
-                            class="add-drug-select"
-                            @focus="openAddDrugSelect"
-                          >
-                            <template #suffix>
-                              <IconifyIconOffline :icon="ArrowDown" />
-                            </template>
-                          </el-input>
-                        </template>
-                        <!-- 药品选择面板 -->
-                        <div class="drug-select-panel">
-                          <!-- 筛选选项 -->
-                          <div class="drug-filter-options">
-                            <el-checkbox v-model="drugFilters.showOwnDrug" @change="handleDrugSearch">
-                              仅显示自有药品
-                            </el-checkbox>
-                            <el-checkbox v-model="drugFilters.showWestern" @change="handleDrugSearch">
-                              西/成药
-                            </el-checkbox>
-                            <el-checkbox v-model="drugFilters.showChinese" @change="handleDrugSearch">
-                              中药
-                            </el-checkbox>
-                            <el-checkbox v-model="drugFilters.showExam" @change="handleDrugSearch">
-                              检查检验项目
-                            </el-checkbox>
-                            <el-checkbox v-model="drugFilters.showTreatment" @change="handleDrugSearch">
-                              处置项目
-                            </el-checkbox>
-                            <el-checkbox v-model="drugFilters.showAdditional" @change="handleDrugSearch">
-                              附加费
-                            </el-checkbox>
-                          </div>
-                          <!-- 药品表格 -->
-                          <el-table
-                            :data="drugTableData"
-                            border
-                            stripe
-                            height="400"
-                            @row-click="handleAddDrugSelect"
-                            style="cursor: pointer"
-                          >
-                            <el-table-column prop="name" label="名字" width="180" />
-                            <el-table-column prop="specification" label="规格" width="180" />
-                            <el-table-column prop="manufacturer" label="生产厂家" min-width="200" />
-                            <el-table-column prop="stock" label="库存" width="120" />
-                            <el-table-column prop="price" label="价格" width="120" />
-                            <el-table-column prop="source" label="来源" width="120" />
-                          </el-table>
-                          <!-- 分页 -->
-                          <div class="drug-pagination">
-                            <el-pagination
-                              v-model:current-page="drugPagination.currentPage"
-                              v-model:page-size="drugPagination.pageSize"
-                              :total="drugPagination.total"
-                              :page-sizes="[20, 50, 100]"
-                              layout="total, sizes, prev, pager, next, jumper"
-                              @size-change="loadDrugList"
-                              @current-change="loadDrugList"
-                            />
-                          </div>
-                        </div>
-                      </el-popover>
+                      <BqMedicineSelector
+                        ref="medicineSelectorRef"
+                        v-model="addDrugInputText"
+                        class="add-drug-selector"
+                        @select="handleAddDrugSelect"
+                      />
                     </td>
                   </tr>
                 </tbody>
@@ -606,13 +572,26 @@ onMounted(() => {
             <!-- 底部操作区 -->
             <div class="retail-footer">
               <div class="total-amount">
-                总金额：<span class="amount-value">{{ getTotalAmount().toFixed(2) }}</span>元
+                总金额：<span class="amount-value">{{
+                  getTotalAmount().toFixed(2)
+                }}</span
+                >元
               </div>
               <div class="action-buttons">
-                <el-button type="primary" class="btn-save" @click="handleSaveRetail">
+                <el-button
+                  type="primary"
+                  class="btn-save"
+                  :loading="saving"
+                  @click="handleSaveRetail"
+                >
                   保存
                 </el-button>
-                <el-button type="warning" class="btn-charge" @click="handleChargeRetail">
+                <el-button
+                  type="warning"
+                  class="btn-charge"
+                  :loading="saving"
+                  @click="handleChargeRetail"
+                >
                   收费
                 </el-button>
               </div>
@@ -624,7 +603,15 @@ onMounted(() => {
       <!-- 零售记录 -->
       <el-tab-pane label="零售记录" name="diagnosed" lazy>
         <div class="tab-content">
-          <div class="main">
+          <!-- 详情面板（覆盖显示） -->
+          <RetailDetailDialog
+            v-if="detailPanelVisible"
+            v-model:visible="detailPanelVisible"
+            :detail-data="currentDetailData"
+          />
+
+          <!-- 列表视图 -->
+          <div v-show="!detailPanelVisible" class="main">
             <!-- 查询表单 -->
             <el-form
               ref="queryFormRef"
@@ -633,7 +620,11 @@ onMounted(() => {
               class="search-form bg-bg_color w-[99/100] pl-8 pt-[12px] overflow-auto"
             >
               <el-form-item>
-                <el-select v-model="retailRecordQueryForm.status" placeholder="全部" class="!w-[120px]">
+                <el-select
+                  v-model="retailRecordQueryForm.status"
+                  placeholder="全部"
+                  class="!w-[120px]"
+                >
                   <el-option label="全部" value="" />
                   <el-option label="已收费" :value="1" />
                   <el-option label="未收费" :value="0" />
@@ -697,8 +688,9 @@ onMounted(() => {
                     adaptive
                     border
                     stripe
+                    :loading="retailRecordLoading"
                     :data="retailRecordList"
-                    row-key="id"
+                    row-key="eid"
                     :columns="dynamicColumns"
                     :pagination="retailRecordPagination"
                     :paginationSmall="size === 'small'"
@@ -710,7 +702,7 @@ onMounted(() => {
                   >
                     <!-- 状态列 -->
                     <template #status="{ row }">
-                      <span>{{ row.status === 1 ? '已收费' : '未收费' }}</span>
+                      <span>{{ row.status === 1 ? "已收费" : "未收费" }}</span>
                     </template>
 
                     <!-- 操作列 -->
@@ -780,18 +772,59 @@ onMounted(() => {
     background-color: white;
     overflow: hidden;
 
+    // 患者信息折叠面板
+    .patient-info-wrapper {
+      margin-bottom: 12px;
+      border-radius: 4px;
+      background-color: #fff;
+
+      .patient-info-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background-color: #f5f7fa;
+        }
+
+        .header-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #303133;
+        }
+
+        .collapse-icon {
+          font-size: 16px;
+          color: #909399;
+          transition: transform 0.3s;
+        }
+      }
+    }
+
+    // 折叠动画
+    .collapse-transition-enter-active,
+    .collapse-transition-leave-active {
+      transition: all 0.3s ease-in-out;
+      max-height: 500px;
+      overflow: hidden;
+    }
+
+    .collapse-transition-enter-from,
+    .collapse-transition-leave-to {
+      max-height: 0;
+      opacity: 0;
+    }
+
     // 新增零售表单容器
     .retail-form-container {
       padding: 20px;
       height: 100%;
       display: flex;
       flex-direction: column;
-
-      .retail-header {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 16px;
-      }
 
       .retail-table-wrapper {
         flex: 1;
@@ -857,7 +890,13 @@ onMounted(() => {
                 }
 
                 .add-drug-select {
+                  width: 250px;
+                }
+
+                // BqMedicineSelector 样式
+                .add-drug-selector {
                   width: 100%;
+                  max-width: 400px;
                 }
 
                 // 药品选择输入框
@@ -922,34 +961,6 @@ onMounted(() => {
         }
       }
     }
-  }
-}
-
-// 药品选择面板样式
-:deep(.drug-select-panel) {
-  .drug-search-input {
-    margin-bottom: 12px;
-  }
-
-  .drug-filter-options {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
-    padding: 8px 0;
-    border-bottom: 1px solid #e4e7ed;
-
-    .el-checkbox {
-      margin-right: 0;
-      white-space: nowrap;
-    }
-  }
-
-  .drug-pagination {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #e4e7ed;
   }
 }
 </style>

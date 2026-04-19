@@ -10,7 +10,7 @@ import {
   addDeptApi,
   deleteDeptApi,
   getDeptEntityDefault,
-  getDeptListApi,
+  getDeptPageApi,
   setStatusDeptApi,
   updateDeptApi
 } from "@/api/system/dept";
@@ -29,6 +29,13 @@ export function useDept() {
   const loading = ref(true);
   const switchLoadMap = ref({});
   const { switchStyle, tagStyle } = usePublicHooks();
+
+  // 分页配置
+  const pagination = reactive({
+    currentPage: 1,
+    pageSize: 20,
+    total: 0
+  });
 
   const columns: TableColumnList = [
     {
@@ -163,6 +170,8 @@ export function useDept() {
 
   function getSearchParams(params?: any) {
     return {
+      page: pagination.currentPage,
+      size: pagination.pageSize,
       filters: getSearchFilter(params),
       orders: getSearchOrder()
     };
@@ -171,11 +180,27 @@ export function useDept() {
   async function onSearch() {
     loading.value = true;
     try {
-      const { data } = await getDeptListApi(getSearchParams(toRaw(form)));
-      dataList.value = handleTree(data || []);
+      const { data } = await getDeptPageApi(getSearchParams(toRaw(form)));
+      if (data) {
+        dataList.value = data.records || [];
+        pagination.total = data.total || 0;
+      }
     } finally {
       loading.value = false;
     }
+  }
+
+  // 分页改变
+  function handlePageChange(page: number) {
+    pagination.currentPage = page;
+    onSearch();
+  }
+
+  // 每页显示数量改变
+  function handleSizeChange(size: number) {
+    pagination.pageSize = size;
+    pagination.currentPage = 1;
+    onSearch();
   }
 
   function formatHigherDeptOptions(treeList) {
@@ -248,6 +273,7 @@ export function useDept() {
     loading,
     columns,
     dataList,
+    pagination,
     /** 搜索 */
     onSearch,
     /** 重置 */
@@ -256,6 +282,10 @@ export function useDept() {
     openDialog,
     /** 删除科室 */
     handleDelete,
-    handleSelectionChange
+    handleSelectionChange,
+    /** 分页改变 */
+    handlePageChange,
+    /** 每页显示数量改变 */
+    handleSizeChange
   };
 }

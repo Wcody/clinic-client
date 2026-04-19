@@ -113,7 +113,9 @@ const handleSave = () => {
   }
 
   // TODO: 调用后端接口保存
-  ElMessage.success(dialogTitle.value === "添加挂号项" ? "添加成功" : "编辑成功");
+  ElMessage.success(
+    dialogTitle.value === "添加挂号项" ? "添加成功" : "编辑成功"
+  );
   dialogVisible.value = false;
   handleQuery();
 };
@@ -125,21 +127,23 @@ const handleToggleStatus = (row: any) => {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
     type: "warning"
-  }).then(() => {
-    // TODO: 调用后端接口
-    row.status = !row.status;
-    ElMessage.success(`${action}成功`);
-  }).catch(() => {});
+  })
+    .then(() => {
+      // TODO: 调用后端接口
+      row.status = !row.status;
+      ElMessage.success(`${action}成功`);
+    })
+    .catch(() => {});
 };
 
 // 设置默认
 const handleSetDefault = (row: any) => {
   if (row.isDefault) return;
-  
+
   dataList.value.forEach(item => {
     item.isDefault = item.id === row.id;
   });
-  
+
   // TODO: 调用后端接口
   ElMessage.success("设置默认成功");
 };
@@ -200,7 +204,7 @@ onMounted(() => {
                 :label="true"
                 @change="handleSetDefault(row)"
               >
-                <span></span>
+                <span />
               </el-radio>
             </template>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import { useDept } from "./utils/hook";
 import { PureTableBar } from "@/components/RePureTableBar";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
@@ -20,11 +20,14 @@ const {
   loading,
   columns,
   dataList,
+  pagination,
   onSearch,
   resetForm,
   openDialog,
   handleDelete,
-  handleSelectionChange
+  handleSelectionChange,
+  handlePageChange,
+  handleSizeChange
 } = useDept();
 </script>
 
@@ -93,22 +96,26 @@ const {
           adaptive
           border
           stripe
-          :adaptiveConfig="{ offsetBottom: 45 }"
+          :adaptiveConfig="{ offsetBottom: 110 }"
           align-whole="center"
           row-key="eid"
           showOverflowTooltip
           table-layout="auto"
-          default-expand-all
           :loading="loading"
           :size="size"
           :data="dataList"
           :columns="dynamicColumns"
+          :pagination="pagination"
+          :paginationSmall="size === 'small' ? true : false"
           :header-cell-style="{
             color: 'var(--el-text-color-primary)'
           }"
           @selection-change="handleSelectionChange"
+          @page-size-change="handleSizeChange"
+          @page-current-change="handlePageChange"
         >
-          <template #operation="{ row }">
+          <!-- 操作 -->
+          <template #operation="{ row, size }">
             <el-button
               v-auth="'dept:update'"
               class="reset-margin"
@@ -119,17 +126,6 @@ const {
               @click="openDialog('修改', row)"
             >
               修改
-            </el-button>
-            <el-button
-              v-auth="'dept:save'"
-              class="reset-margin"
-              link
-              type="primary"
-              :size="size"
-              :icon="useRenderIcon(AddFill)"
-              @click="openDialog('新增', { parentId: row.eid } as any)"
-            >
-              新增
             </el-button>
             <el-popconfirm
               :title="`是否确认删除科室名称为${row.name}的这条数据`"
@@ -154,19 +150,3 @@ const {
     </PureTableBar>
   </div>
 </template>
-
-<style lang="scss" scoped>
-:deep(.el-table__inner-wrapper::before) {
-  height: 0;
-}
-
-.main-content {
-  margin: 8px 8px 0 8px !important;
-}
-
-.search-form {
-  :deep(.el-form-item) {
-    margin-bottom: 12px;
-  }
-}
-</style>

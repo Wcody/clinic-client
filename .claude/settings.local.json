@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(xargs cat:*)",
+      "Bash(npx tsc *)",
+      "Bash(mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW TABLES;\")",
+      "Bash(where mysql *)",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW TABLES;\")",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW CREATE TABLE bq_patient\\\\G\")",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW CREATE TABLE tb_medical_record\\\\G\")",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW CREATE TABLE tb_diagnosis_dict\\\\G\")",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic)",
+      "Bash(/d/000AppDevTool/mysql/mysql-8.4/bin/mysql -h 127.0.0.1 -P 3388 -u root -p123456 db_clinic -e \"SHOW TABLES LIKE 'bq_%';\")",
+      "Bash(find /d -path \"*libcommon/entity/BQEidBaseEntity.java\")",
+      "Bash(find /d -path \"*BQEidBaseEntity.java\")",
+      "Bash(find /d -path \"*libcommon/entity/BQIdBaseEntity.java\")",
+      "Bash(find /d -path \"*BQIdBaseEntity.java\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(jar tf *)",
+      "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip = [System.IO.Compression.ZipFile]::OpenRead\\(\"C:\\\\Users\\\\Wcke\\\\.m2\\\\repository\\\\org\\\\docx4j\\\\docx4j-export-fo\\\\11.4.9\\\\docx4j-export-fo-11.4.9.jar\"\\); $zip.Entries | Where-Object { $_.Name -match \"FORenderer|fos|Fop\" } | Select-Object -ExpandProperty FullName | head -20; $zip.Dispose\\(\\))",
+      "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip = [System.IO.Compression.ZipFile]::OpenRead\\(\"C:\\\\Users\\\\Wcke\\\\.m2\\\\repository\\\\org\\\\docx4j\\\\docx4j-export-fo\\\\11.4.9\\\\docx4j-export-fo-11.4.9.jar\"\\); $zip.Entries | Where-Object { $_.FullName -match \"FORenderer|/fos/|Fop\" } | Select-Object -ExpandProperty FullName; $zip.Dispose\\(\\))",
+      "PowerShell($javaHome = $env:JAVA_HOME; if \\(-not $javaHome\\) { $javaHome = \\(Get-Command java -ErrorAction SilentlyContinue | Split-Path -Parent | Split-Path -Parent\\) }; & \"$javaHome\\\\bin\\\\javap.exe\" -p -cp \"C:\\\\Users\\\\Wcke\\\\.m2\\\\repository\\\\org\\\\docx4j\\\\docx4j-export-fo\\\\11.4.9\\\\docx4j-export-fo-11.4.9.jar\" \"org.docx4j.convert.out.fo.renderers.FORendererApacheFOP\" 2>&1)",
+      "Read(//c/Program Files/**)",
+      "Read(//d/000AppDevTool//**)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\Java\" -ErrorAction SilentlyContinue; Get-ChildItem \"D:\\\\000AppDevTool\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"jdk|java\" })",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Read(//d/d/Wcke/000SourceCode/IDEAProjects/**)",
+      "Bash(npx vue-tsc *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Read(//d/Wcke/000SourceCode/**)"
+    ],
+    "additionalDirectories": [
+      "d:\\Wcke\\000SourceCode\\IDEAProjects\\Clinic-Client\\src\\views\\visit\\doctor",
+      "D:\\Wcke\\000SourceCode\\IDEAProjects\\Clinic-Client\\src\\views\\setting"
+    ]
+  }
+}

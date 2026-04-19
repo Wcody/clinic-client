@@ -1,0 +1,1 @@
+2026-04-13 19:09:32.650 [restartedMain] WARN  org.springframework.aop.framework.CglibAopProxy - Unable to proxy interface-implementing method [public final java.lang.Iterable com.qkplm.clinic.clinicserver.service.impl.TbMenuServiceImpl.listByParentId(java.lang.String,java.util.List)] because it is marked as final, consider using interface-based JDK proxies instead.

@@ -157,7 +157,7 @@ export function useRole(tableRef: Ref) {
 
   function getSearchParams(params?: any) {
     return {
-      current: pagination.currentPage,
+      page: pagination.currentPage,
       size: pagination.pageSize,
       filters: getSearchFilter(params),
       orders: getSearchOrder()

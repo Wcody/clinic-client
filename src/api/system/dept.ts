@@ -79,7 +79,7 @@ export const updateDeptApi = (data?: object) => {
 };
 
 /**
- * 获取所有科室API
+ * 获取所有科室API (列表,不分页)
  */
 export const getDeptListApi = (data?: object) => {
   const params = {
@@ -87,6 +87,19 @@ export const getDeptListApi = (data?: object) => {
     orders: [new BQSearchOrder("orderValue")]
   };
   return http.request<BQDeptSearchListResultType>("get", "/dept/list", {
+    params
+  });
+};
+
+/**
+ * 分页获取科室API
+ */
+export const getDeptPageApi = (data?: object) => {
+  const params = {
+    ...data,
+    orders: [new BQSearchOrder("orderValue")]
+  };
+  return http.request<BQDeptSearchPageResultType>("get", "/dept/page", {
     params
   });
 };

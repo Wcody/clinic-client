@@ -10,29 +10,44 @@ export function useColumns() {
   const columns: TableColumnList = [
     {
       sortable: false,
-      label: "排名",
-      prop: "id"
+      label: "序号",
+      prop: "id",
+      width: 60
     },
     {
       sortable: false,
-      label: "用户",
-      prop: "requiredNumber"
+      label: "患者姓名",
+      prop: "name"
     },
     {
       sortable: false,
-      label: "质控数量",
-      prop: "questionNumber"
+      label: "科室",
+      prop: "department"
     },
     {
       sortable: false,
-      label: "统计日期",
+      label: "接诊医生",
+      prop: "doctor"
+    },
+    {
+      sortable: false,
+      label: "就诊时间",
       prop: "date"
+    },
+    {
+      sortable: false,
+      label: "状态",
+      prop: "status",
+      cellRenderer: ({ row }) => {
+        const colorMap = {
+          已完成: "#26ce83",
+          待接诊: "#e85f33",
+          已接诊: "#38bdf8"
+        };
+        const color = colorMap[row.status] ?? "#909399";
+        return <span style={{ color, fontWeight: 500 }}>{row.status}</span>;
+      }
     }
-    // {
-    //   label: "操作",
-    //   fixed: "right",
-    //   slot: "operation"
-    // }
   ];
 
   /** 分页配置 */
@@ -45,7 +60,6 @@ export function useColumns() {
   });
 
   function onCurrentChange(page: number) {
-    console.log("onCurrentChange", page);
     loading.value = true;
     delay(300).then(() => {
       loading.value = false;
@@ -53,7 +67,6 @@ export function useColumns() {
   }
 
   onMounted(() => {
-    // 这里获取排行榜数据
     dataList.value = tableData;
     pagination.total = dataList.value.length;
     loading.value = false;

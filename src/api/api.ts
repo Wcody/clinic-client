@@ -6,6 +6,7 @@ import { http } from "@/utils/http";
 export type BQResultType<T> = {
   code: number;
   message: string;
+  errMsg: string;
   exception: string;
   data: T;
 };

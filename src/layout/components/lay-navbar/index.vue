@@ -69,7 +69,7 @@ onMounted(async () => {
       <img
         :src="tenantLogo"
         :title="tenantName"
-        style="height: 32px; margin-right: 12px"
+        style="height: 28px; margin-right: 12px"
       />
       <span style="color: gray">{{ tenantName }}</span>
       <!-- 菜单搜索 -->

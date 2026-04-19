@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import Refresh from "@iconify-icons/ep/refresh";
 import { PureTableBar } from "@/components/RePureTableBar";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { deviceDetection } from "@pureadmin/utils";
 import { useWindowSize } from "@vueuse/core";
 import PureTable from "@pureadmin/table";
+import PatientDetail from "./comp/PatientDetail.vue";
+import {
+  getVisitRecordListApi,
+  updateVisitRecordApi,
+  type BQVisitRecordEntityType,
+  type BQVisitRecordSearchParams
+} from "@/api/visit/record";
+import router from "@/router";
+import dayjs from "dayjs";
 
 defineOptions({
   name: "VisitList"
@@ -51,20 +60,35 @@ const handleTabChange = () => {
   handleQuery();
 };
 
+// ==================== 年龄格式化 ====================
+const formatAge = (row: BQVisitRecordEntityType) => {
+  const { firstAge, lastAge, ageType } = row;
+  if (firstAge == null) return "";
+  if (ageType === 1) {
+    return lastAge ? `${firstAge}岁${lastAge}月` : `${firstAge}岁`;
+  }
+  if (ageType === 2) {
+    return lastAge ? `${firstAge}月${lastAge}天` : `${firstAge}月`;
+  }
+  if (ageType === 3) return `${firstAge}天`;
+  return String(firstAge);
+};
+
 // ==================== 待诊患者 ====================
-const pendingColumns = ref([
+const pendingColumns = ref<any>([
   { label: "序号", prop: "index", minWidth: 80, slot: "index" },
-  { label: "姓名", prop: "name", minWidth: 120 },
+  { label: "姓名", prop: "patient", minWidth: 120 },
   { label: "性别", prop: "gender", minWidth: 80 },
-  { label: "年龄", prop: "age", minWidth: 100 },
+  { label: "年龄", prop: "firstAge", minWidth: 100, slot: "pendingAge" },
+  { label: "挂号号", prop: "registrationNo", minWidth: 120 },
+  { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
-  { label: "挂号时间", prop: "registerTime", minWidth: 160 },
-  { label: "备注", prop: "remark", minWidth: 150 },
-  { label: "状态", prop: "status", minWidth: 100 },
+  { label: "挂号时间", prop: "orderTime", minWidth: 160 },
   { label: "操作", fixed: "right", width: 150, slot: "pendingOperation" }
 ]);
 
-const pendingList = ref([]);
+const pendingList = ref<BQVisitRecordEntityType[]>([]);
+const loading = ref(false);
 
 const pendingPagination = reactive({
   currentPage: 1,
@@ -75,86 +99,92 @@ const pendingPagination = reactive({
 // ==================== 已诊患者 ====================
 const diagnosedQueryForm = reactive({
   patientName: "",
-  dateRange: ["", ""]
+  dateRange: [
+    dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
+    dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+  ]
 });
 
-const diagnosedColumns = ref([
-  { label: "姓名", prop: "name", minWidth: 150 },
+const diagnosedColumns = ref<any>([
+  { label: "姓名", prop: "patient", minWidth: 150 },
   { label: "性别", prop: "gender", minWidth: 100 },
-  { label: "年龄", prop: "age", minWidth: 120 },
+  { label: "年龄", prop: "firstAge", minWidth: 120, slot: "diagnosedAge" },
+  { label: "挂号号", prop: "registrationNo", minWidth: 120 },
+  { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
-  { label: "就诊时间", prop: "visitTime", minWidth: 180 },
-  { label: "状态", prop: "status", minWidth: 100 },
-  { label: "操作", fixed: "right", width: 150, slot: "diagnosedOperation" }
+  { label: "就诊时间", prop: "orderTime", minWidth: 180 },
+  { label: "操作", fixed: "right", width: 300, slot: "diagnosedOperation" }
 ]);
 
-const diagnosedList = ref([
-  {
-    id: "1",
-    name: "车梦儿",
-    gender: "女",
-    age: "31岁0月",
-    doctor: "曾俊华",
-    visitTime: "2026-04-11 17:01:05",
-    status: "未收费"
-  },
-  {
-    id: "2",
-    name: "麦穗",
-    gender: "女",
-    age: "28岁9月",
-    doctor: "曾俊华",
-    visitTime: "2026-04-11 16:59:25",
-    status: "未收费"
-  },
-  {
-    id: "3",
-    name: "陈梅芳",
-    gender: "女",
-    age: "32岁4月",
-    doctor: "曾俊华",
-    visitTime: "2026-04-11 16:52:47",
-    status: "未收费"
-  },
-  {
-    id: "4",
-    name: "吴国静夫莫陈彪",
-    gender: "男",
-    age: "27岁0月",
-    doctor: "曾俊华",
-    visitTime: "2026-04-11 16:17:40",
-    status: "未收费"
-  },
-  {
-    id: "5",
-    name: "黄巧夫李春辉",
-    gender: "男",
-    age: "36岁0月",
-    doctor: "曾俊华",
-    visitTime: "2026-04-11 16:14:05",
-    status: "未收费"
-  }
-]);
+const diagnosedList = ref<BQVisitRecordEntityType[]>([]);
 
 const diagnosedPagination = reactive({
   currentPage: 1,
   pageSize: 20,
-  total: 28525
+  total: 0
 });
 
 // ==================== 方法 ====================
 // 查询数据
-const handleQuery = () => {
-  if (activeTab.value === "pending") {
-    // 查询待诊患者
-  } else {
-    // 查询已诊患者
+const handleQuery = async () => {
+  loading.value = true;
+  try {
+    if (activeTab.value === "pending") {
+      // 查询待诊患者（status = "待接诊"）
+      const params: BQVisitRecordSearchParams = {
+        patientName: diagnosedQueryForm.patientName,
+        status: "待接诊",
+        currentPage: pendingPagination.currentPage,
+        pageSize: pendingPagination.pageSize
+      };
+
+      const res = await getVisitRecordListApi(params);
+      console.log("查询待诊患者接口返回：", res);
+      if (res.code === 0 && res.data) {
+        pendingList.value = res.data.list || [];
+        pendingPagination.total = res.data.total || 0;
+      } else {
+        ElMessage.error(res.errMsg || "查询失败");
+      }
+    } else {
+      // 查询已诊患者（status = "已接诊"）
+      const params: BQVisitRecordSearchParams = {
+        patientName: diagnosedQueryForm.patientName,
+        status: "已接诊",
+        currentPage: diagnosedPagination.currentPage,
+        pageSize: diagnosedPagination.pageSize
+      };
+
+      if (
+        diagnosedQueryForm.dateRange &&
+        diagnosedQueryForm.dateRange.length === 2
+      ) {
+        params.startTime = diagnosedQueryForm.dateRange[0];
+        params.endTime = diagnosedQueryForm.dateRange[1];
+      }
+
+      const res = await getVisitRecordListApi(params);
+      if (res.code === 0 && res.data) {
+        diagnosedList.value = res.data.list || [];
+        diagnosedPagination.total = res.data.total || 0;
+      } else {
+        ElMessage.error(res.errMsg || "查询失败");
+      }
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || "查询失败");
+  } finally {
+    loading.value = false;
   }
 };
 
 // 查询
 const handleSearch = () => {
-  diagnosedPagination.currentPage = 1;
+  if (activeTab.value === "pending") {
+    pendingPagination.currentPage = 1;
+  } else {
+    diagnosedPagination.currentPage = 1;
+  }
   handleQuery();
 };
 
@@ -162,7 +192,11 @@ const handleSearch = () => {
 const handleResetQuery = () => {
   diagnosedQueryForm.patientName = "";
   diagnosedQueryForm.dateRange = ["", ""];
-  diagnosedPagination.currentPage = 1;
+  if (activeTab.value === "pending") {
+    pendingPagination.currentPage = 1;
+  } else {
+    diagnosedPagination.currentPage = 1;
+  }
   handleQuery();
 };
 
@@ -189,13 +223,40 @@ const handleDiagnosedSizeChange = (size: number) => {
 };
 
 // 查看患者详情
-const handleViewPatientDetail = (row: any) => {
-  ElMessage.info(`查看患者详情: ${row.name}`);
+const showPatientDetail = ref(false);
+const selectedPatient = ref<any>(null);
+
+const handleViewPatientDetail = (row: BQVisitRecordEntityType) => {
+  selectedPatient.value = row;
+  showPatientDetail.value = true;
 };
 
-// 查看就诊详情
-const handleViewVisitDetail = (row: any) => {
-  ElMessage.info(`查看就诊详情: ${row.name}`);
+const handlePatientDetailBack = () => {
+  showPatientDetail.value = false;
+  selectedPatient.value = null;
+};
+
+// 接诊操作（将状态从"待接诊"更新为"已接诊"）
+const handleReceivePatient = async (row: BQVisitRecordEntityType) => {
+  // 路由跳转
+  router.push({
+    name: "WorkDoctor",
+    query: {
+      regId: row.id,
+      patientId: row.patientId
+    }
+  });
+};
+
+// 就诊详情（跳转到医生工作台查看）
+const handleViewVisitDetail = (row: BQVisitRecordEntityType) => {
+  router.push({
+    name: "WorkDoctor",
+    query: {
+      regId: row.id,
+      patientId: row.patientId
+    }
+  });
 };
 
 // Lifecycle
@@ -238,6 +299,7 @@ onMounted(() => {
                     stripe
                     :adaptiveConfig="{ offsetBottom: tableOffsetBottom }"
                     :data="pendingList"
+                    :loading="loading"
                     row-key="id"
                     :columns="dynamicColumns"
                     :pagination="pendingPagination"
@@ -250,12 +312,30 @@ onMounted(() => {
                   >
                     <!-- 序号列 -->
                     <template #index="{ $index }">
-                      <span>{{ (pendingPagination.currentPage - 1) * pendingPagination.pageSize + $index + 1 }}</span>
+                      <span>{{
+                        (pendingPagination.currentPage - 1) *
+                          pendingPagination.pageSize +
+                        $index +
+                        1
+                      }}</span>
+                    </template>
+
+                    <!-- 年龄列 -->
+                    <template #pendingAge="{ row }">
+                      <span>{{ formatAge(row) }}</span>
                     </template>
 
                     <!-- 操作列 -->
-                    <template #pendingOperation>
-                      <span class="text-gray-400">无操作</span>
+                    <template #pendingOperation="{ row }">
+                      <el-button
+                        class="reset-margin"
+                        link
+                        type="primary"
+                        :size="size"
+                        @click="handleReceivePatient(row)"
+                      >
+                        接诊
+                      </el-button>
                     </template>
                   </pure-table>
                 </template>
@@ -268,7 +348,15 @@ onMounted(() => {
       <!-- 已诊患者 -->
       <el-tab-pane label="已诊患者" name="diagnosed">
         <div class="tab-content">
-          <div class="main">
+          <!-- 患者详情覆盖层 -->
+          <PatientDetail
+            v-if="showPatientDetail && selectedPatient"
+            :patient="selectedPatient"
+            class="detail-overlay"
+            @back="handlePatientDetailBack"
+          />
+
+          <div v-show="!showPatientDetail" class="main">
             <!-- 查询表单 -->
             <el-form
               ref="queryFormRef"
@@ -303,7 +391,10 @@ onMounted(() => {
                 >
                   查询
                 </el-button>
-                <el-button :icon="useRenderIcon(Refresh)" @click="handleResetQuery">
+                <el-button
+                  :icon="useRenderIcon(Refresh)"
+                  @click="handleResetQuery"
+                >
                   重置
                 </el-button>
               </el-form-item>
@@ -332,6 +423,7 @@ onMounted(() => {
                     stripe
                     :adaptiveConfig="{ offsetBottom: tableOffsetBottom }"
                     :data="diagnosedList"
+                    :loading="loading"
                     row-key="id"
                     :columns="dynamicColumns"
                     :pagination="diagnosedPagination"
@@ -342,6 +434,11 @@ onMounted(() => {
                     @page-size-change="handleDiagnosedSizeChange"
                     @page-current-change="handleDiagnosedPageChange"
                   >
+                    <!-- 年龄列 -->
+                    <template #diagnosedAge="{ row }">
+                      <span>{{ formatAge(row) }}</span>
+                    </template>
+
                     <!-- 操作列 -->
                     <template #diagnosedOperation="{ row }">
                       <el-button
@@ -416,6 +513,15 @@ onMounted(() => {
     height: calc(100vh - 169px);
     padding: 0;
     background-color: white;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .detail-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background-color: #fff;
     overflow: hidden;
   }
 }

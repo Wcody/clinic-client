@@ -50,7 +50,7 @@
     height: 100vh;
     min-height: 100%;
     margin-left: $sideBarWidth;
-    background: #f0f2f5;
+    background: #f0f4f5;
 
     /* main-content 属性动画 */
     transition: margin-left var(--pure-transition-duration);
@@ -657,7 +657,7 @@ body[layout="vertical"] {
   /* 设置 */
   .set-icon {
     &:hover {
-      background: #f6f6f6;
+      background: rgba(45, 212, 191, 0.1);
     }
   }
 }

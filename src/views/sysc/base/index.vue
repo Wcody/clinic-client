@@ -35,22 +35,123 @@ const tabConfigs = {
       { label: "所属类别", prop: "category", minWidth: 120 },
       { label: "药品类别", prop: "drugCategory", minWidth: 120 },
       { label: "排序", prop: "sortOrder", minWidth: 100 },
-      { label: "执行项目", prop: "executeProject", minWidth: 120, slot: "executeProject" },
+      {
+        label: "执行项目",
+        prop: "executeProject",
+        minWidth: 120,
+        slot: "executeProject"
+      },
       { label: "操作", fixed: "right", width: 200, slot: "operation" }
     ],
     data: [
-      { id: "1", name: "口服", category: "用法", drugCategory: "西药", sortOrder: 1, isPublic: true, executeProject: false },
-      { id: "2", name: "冲服", category: "用法", drugCategory: "西药", sortOrder: 2, isPublic: true, executeProject: false },
-      { id: "3", name: "静脉注射", category: "用法", drugCategory: "西药", sortOrder: 3, isPublic: true, executeProject: true },
-      { id: "4", name: "静脉滴注", category: "用法", drugCategory: "西药", sortOrder: 3, isPublic: true, executeProject: true },
-      { id: "5", name: "肌肉注射", category: "用法", drugCategory: "西药", sortOrder: 4, isPublic: true, executeProject: true },
-      { id: "6", name: "皮下注射", category: "用法", drugCategory: "西药", sortOrder: 5, isPublic: true, executeProject: true },
-      { id: "7", name: "皮试", category: "用法", drugCategory: "西药", sortOrder: 6, isPublic: true, executeProject: true },
-      { id: "8", name: "舌下含服", category: "用法", drugCategory: "西药", sortOrder: 7, isPublic: true, executeProject: false },
-      { id: "9", name: "穴位注射", category: "用法", drugCategory: "西药", sortOrder: 7, isPublic: false, executeProject: false },
-      { id: "10", name: "外用", category: "用法", drugCategory: "西药", sortOrder: 8, isPublic: true, executeProject: false },
-      { id: "11", name: "外敷", category: "用法", drugCategory: "西药", sortOrder: 9, isPublic: true, executeProject: false },
-      { id: "12", name: "外洗", category: "用法", drugCategory: "西药", sortOrder: 10, isPublic: true, executeProject: false }
+      {
+        id: "1",
+        name: "口服",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 1,
+        isPublic: true,
+        executeProject: false
+      },
+      {
+        id: "2",
+        name: "冲服",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 2,
+        isPublic: true,
+        executeProject: false
+      },
+      {
+        id: "3",
+        name: "静脉注射",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 3,
+        isPublic: true,
+        executeProject: true
+      },
+      {
+        id: "4",
+        name: "静脉滴注",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 3,
+        isPublic: true,
+        executeProject: true
+      },
+      {
+        id: "5",
+        name: "肌肉注射",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 4,
+        isPublic: true,
+        executeProject: true
+      },
+      {
+        id: "6",
+        name: "皮下注射",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 5,
+        isPublic: true,
+        executeProject: true
+      },
+      {
+        id: "7",
+        name: "皮试",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 6,
+        isPublic: true,
+        executeProject: true
+      },
+      {
+        id: "8",
+        name: "舌下含服",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 7,
+        isPublic: true,
+        executeProject: false
+      },
+      {
+        id: "9",
+        name: "穴位注射",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 7,
+        isPublic: false,
+        executeProject: false
+      },
+      {
+        id: "10",
+        name: "外用",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 8,
+        isPublic: true,
+        executeProject: false
+      },
+      {
+        id: "11",
+        name: "外敷",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 9,
+        isPublic: true,
+        executeProject: false
+      },
+      {
+        id: "12",
+        name: "外洗",
+        category: "用法",
+        drugCategory: "西药",
+        sortOrder: 10,
+        isPublic: true,
+        executeProject: false
+      }
     ],
     total: 41
   },
@@ -63,18 +164,90 @@ const tabConfigs = {
       { label: "操作", fixed: "right", width: 200, slot: "operation" }
     ],
     data: [
-      { id: "1", name: "每日一次（qd） 1天1次", category: "频率", sortOrder: 1, isPublic: true },
-      { id: "2", name: "每日两次（bid） 1天2次", category: "频率", sortOrder: 2, isPublic: true },
-      { id: "3", name: "每日三次（tid） 1天3次", category: "频率", sortOrder: 3, isPublic: true },
-      { id: "4", name: "每日四次（qid） 1天4次", category: "频率", sortOrder: 4, isPublic: true },
-      { id: "5", name: "饭后 1天3次", category: "频率", sortOrder: 5, isPublic: true },
-      { id: "6", name: "饭前 1天3次", category: "频率", sortOrder: 6, isPublic: true },
-      { id: "7", name: "饭间服用 1天3次", category: "频率", sortOrder: 7, isPublic: true },
-      { id: "8", name: "必要时（prn） 1天1次", category: "频率", sortOrder: 8, isPublic: true },
-      { id: "9", name: "立即（st） 1天1次", category: "频率", sortOrder: 9, isPublic: true },
-      { id: "10", name: "2小时一次 1天12次", category: "频率", sortOrder: 10, isPublic: true },
-      { id: "11", name: "4小时一次 1天6次", category: "频率", sortOrder: 11, isPublic: true },
-      { id: "12", name: "6小时一次 1天4次", category: "频率", sortOrder: 12, isPublic: true }
+      {
+        id: "1",
+        name: "每日一次（qd） 1天1次",
+        category: "频率",
+        sortOrder: 1,
+        isPublic: true
+      },
+      {
+        id: "2",
+        name: "每日两次（bid） 1天2次",
+        category: "频率",
+        sortOrder: 2,
+        isPublic: true
+      },
+      {
+        id: "3",
+        name: "每日三次（tid） 1天3次",
+        category: "频率",
+        sortOrder: 3,
+        isPublic: true
+      },
+      {
+        id: "4",
+        name: "每日四次（qid） 1天4次",
+        category: "频率",
+        sortOrder: 4,
+        isPublic: true
+      },
+      {
+        id: "5",
+        name: "饭后 1天3次",
+        category: "频率",
+        sortOrder: 5,
+        isPublic: true
+      },
+      {
+        id: "6",
+        name: "饭前 1天3次",
+        category: "频率",
+        sortOrder: 6,
+        isPublic: true
+      },
+      {
+        id: "7",
+        name: "饭间服用 1天3次",
+        category: "频率",
+        sortOrder: 7,
+        isPublic: true
+      },
+      {
+        id: "8",
+        name: "必要时（prn） 1天1次",
+        category: "频率",
+        sortOrder: 8,
+        isPublic: true
+      },
+      {
+        id: "9",
+        name: "立即（st） 1天1次",
+        category: "频率",
+        sortOrder: 9,
+        isPublic: true
+      },
+      {
+        id: "10",
+        name: "2小时一次 1天12次",
+        category: "频率",
+        sortOrder: 10,
+        isPublic: true
+      },
+      {
+        id: "11",
+        name: "4小时一次 1天6次",
+        category: "频率",
+        sortOrder: 11,
+        isPublic: true
+      },
+      {
+        id: "12",
+        name: "6小时一次 1天4次",
+        category: "频率",
+        sortOrder: 12,
+        isPublic: true
+      }
     ],
     total: 22
   },
@@ -111,18 +284,66 @@ const tabConfigs = {
       { label: "操作", fixed: "right", width: 200, slot: "operation" }
     ],
     data: [
-      { id: "1", name: "颗粒剂", category: "剂型", sortOrder: 1, isPublic: true },
-      { id: "2", name: "气雾剂", category: "剂型", sortOrder: 2, isPublic: true },
+      {
+        id: "1",
+        name: "颗粒剂",
+        category: "剂型",
+        sortOrder: 1,
+        isPublic: true
+      },
+      {
+        id: "2",
+        name: "气雾剂",
+        category: "剂型",
+        sortOrder: 2,
+        isPublic: true
+      },
       { id: "3", name: "针剂", category: "剂型", sortOrder: 3, isPublic: true },
       { id: "4", name: "片剂", category: "剂型", sortOrder: 4, isPublic: true },
-      { id: "5", name: "胶囊剂", category: "剂型", sortOrder: 5, isPublic: true },
+      {
+        id: "5",
+        name: "胶囊剂",
+        category: "剂型",
+        sortOrder: 5,
+        isPublic: true
+      },
       { id: "6", name: "合剂", category: "剂型", sortOrder: 6, isPublic: true },
-      { id: "7", name: "注射剂", category: "剂型", sortOrder: 7, isPublic: true },
+      {
+        id: "7",
+        name: "注射剂",
+        category: "剂型",
+        sortOrder: 7,
+        isPublic: true
+      },
       { id: "8", name: "丸剂", category: "剂型", sortOrder: 8, isPublic: true },
-      { id: "9", name: "溶液剂", category: "剂型", sortOrder: 9, isPublic: true },
-      { id: "10", name: "滴丸剂", category: "剂型", sortOrder: 10, isPublic: true },
-      { id: "11", name: "注射液", category: "剂型", sortOrder: 11, isPublic: true },
-      { id: "12", name: "喷雾剂", category: "剂型", sortOrder: 12, isPublic: true }
+      {
+        id: "9",
+        name: "溶液剂",
+        category: "剂型",
+        sortOrder: 9,
+        isPublic: true
+      },
+      {
+        id: "10",
+        name: "滴丸剂",
+        category: "剂型",
+        sortOrder: 10,
+        isPublic: true
+      },
+      {
+        id: "11",
+        name: "注射液",
+        category: "剂型",
+        sortOrder: 11,
+        isPublic: true
+      },
+      {
+        id: "12",
+        name: "喷雾剂",
+        category: "剂型",
+        sortOrder: 12,
+        isPublic: true
+      }
     ],
     total: 257
   },
@@ -151,7 +372,9 @@ const tabConfigs = {
 };
 
 // 当前表格列
-const currentColumns = computed(() => tabConfigs[activeTab.value]?.columns || []);
+const currentColumns = computed(
+  () => tabConfigs[activeTab.value]?.columns || []
+);
 // 当前数据列表
 const currentDataList = computed(() => tabConfigs[activeTab.value]?.data || []);
 // 当前总数
@@ -242,7 +465,7 @@ onMounted(() => {
             新建基础项目
           </el-button>
         </template>
-        
+
         <!-- 页签切换 -->
         <template #default>
           <el-tabs
@@ -328,19 +551,13 @@ onMounted(() => {
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item
-          v-if="activeTab === 'usage'"
-          label="药品类别"
-        >
+        <el-form-item v-if="activeTab === 'usage'" label="药品类别">
           <el-select v-model="baseDataForm.drugCategory" style="width: 100%">
             <el-option label="西药" value="西药" />
             <el-option label="中药" value="中药" />
           </el-select>
         </el-form-item>
-        <el-form-item
-          v-if="activeTab === 'usage'"
-          label="执行项目"
-        >
+        <el-form-item v-if="activeTab === 'usage'" label="执行项目">
           <el-switch v-model="baseDataForm.executeProject" />
         </el-form-item>
       </el-form>

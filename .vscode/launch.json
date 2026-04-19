@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // 1. 启动开发服务（对应 npm run dev）
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "📦 前端开发(dev)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "SASS_QUIET_DEPS": "true",
+        "NODE_OPTIONS": "--max-old-space-size=4096"
+      }
+    },
+
+    // 2. 打包项目（对应 npm run build）
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "📦 前端打包(build)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "build"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=8192"
+      }
+    }
+  ]
+}

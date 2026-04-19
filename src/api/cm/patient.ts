@@ -13,24 +13,28 @@ import {
  * 患者实体类型定义
  */
 export type BQPatientEntityType = {
-  patientKind: number;
-  patientCode: string;
-  patientName: string;
-  idCard: string;
-  gender: number;
-  dateOfBirth: string;
-  phoneNumber: string;
-  address: string;
-  nationality: string;
-  ethnicity: string;
-  maritalStatus: number;
-  hasAllergy: boolean;
-  allergicDrug: string;
-  contactPerson: string;
-  contactRelation: string;
-  contactPhoneNumber: string;
-  status: boolean;
-  remark: string;
+  id?: number; // 患者ID（数字类型，来自BQIdBaseEntity）
+  name: string; // 患者姓名
+  gender: string; // 性别
+  age?: string; // 年龄（字符串格式，如"5岁3月"）
+  mobile: string; // 手机号
+  idCard: string; // 身份证号
+  archiveNo?: string; // 档案号
+  province?: number; // 省份ID
+  city?: number; // 城市ID
+  district?: number; // 区县ID
+  address?: string; // 详细地址
+  firstAge?: number; // 初诊年龄
+  lastAge?: number; // 末次年龄
+  ageType?: number; // 年龄类型：1=岁, 2=月, 3=天
+  isAllergy?: boolean; // 是否过敏
+  allergicHistory?: string; // 过敏史
+  pastHistory?: string; // 既往史
+  personalHistory?: string; // 个人史
+  familyHistory?: string; // 家族史
+  obstericalHistory?: string; // 婚育史
+  travelHistory?: string; // 旅行史
+  contactHistory?: string; // 接触史
 } & BQBaseEntityType;
 
 /**
@@ -40,24 +44,27 @@ export const getPatientEntityDefault: (
   row?: BQPatientEntityType
 ) => BQPatientEntityType = (row?: BQPatientEntityType) => {
   return {
-    patientKind: row?.patientKind ?? 0,
-    patientCode: row?.patientCode ?? "",
+    name: row?.name ?? "",
+    gender: row?.gender ?? "男",
+    age: row?.age ?? "",
+    mobile: row?.mobile ?? "",
     idCard: row?.idCard ?? "",
-    patientName: row?.patientName ?? "",
-    gender: row?.gender ?? 0,
-    dateOfBirth: row?.dateOfBirth ?? "",
-    phoneNumber: row?.phoneNumber ?? "",
+    archiveNo: row?.archiveNo ?? "",
+    province: row?.province ?? undefined,
+    city: row?.city ?? undefined,
+    district: row?.district ?? undefined,
     address: row?.address ?? "",
-    nationality: row?.nationality ?? "",
-    ethnicity: row?.ethnicity ?? "",
-    maritalStatus: row?.maritalStatus ?? 0,
-    hasAllergy: row?.hasAllergy ?? false,
-    allergicDrug: row?.allergicDrug ?? "",
-    contactPerson: row?.contactPerson ?? "",
-    contactRelation: row?.contactRelation ?? "",
-    contactPhoneNumber: row?.contactPhoneNumber ?? "",
-    status: row?.status ?? true,
-    remark: row?.remark ?? "",
+    firstAge: row?.firstAge ?? 0,
+    lastAge: row?.lastAge ?? 0,
+    ageType: row?.ageType ?? 1,
+    isAllergy: row?.isAllergy ?? false,
+    allergicHistory: row?.allergicHistory ?? "",
+    pastHistory: row?.pastHistory ?? "",
+    personalHistory: row?.personalHistory ?? "",
+    familyHistory: row?.familyHistory ?? "",
+    obstericalHistory: row?.obstericalHistory ?? "",
+    travelHistory: row?.travelHistory ?? "",
+    contactHistory: row?.contactHistory ?? "",
     ...getBaseEntityDefault(row)
   };
 };
@@ -80,6 +87,13 @@ export type BQPatientSearchPageResultType = BQResultType<
 export type BQPatientSearchListResultType = BQResultType<
   BQSearchListResultType<BQPatientEntityType>
 >;
+
+/**
+ * 根据ID获取单个患者API
+ */
+export const getPatientByIdApi = (id: number) => {
+  return http.request<BQPatientEntityResultType>("get", `/patient/get/${id}`);
+};
 
 /**
  * 增加患者API

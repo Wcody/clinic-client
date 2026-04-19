@@ -80,8 +80,7 @@ const loadAndModifyPdf = async (url: string) => {
   }
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
-  pdfUrlRef.value =
-    "/pdfjs/web/viewer.html?file=" + URL.createObjectURL(blob);
+  pdfUrlRef.value = "/pdfjs/web/viewer.html?file=" + URL.createObjectURL(blob);
 };
 
 function goToPage(page: number) {

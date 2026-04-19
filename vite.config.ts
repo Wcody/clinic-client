@@ -31,15 +31,15 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
           api: "modern-compiler", // 修改api调用方式
           quietDeps: true,// 禁用废弃依赖警告
           additionalData: `
-        $subMenuActiveText: #000000d9 !default;
-        $menuBg: #fff !default;
-        $menuHover: #f6f6f6 !default;
-        $subMenuBg: #fff !default;
-        $subMenuActiveBg: #e0ebf6 !default;
-        $menuText: rgb(0 0 0 / 60%) !default;
-        $sidebarLogo: #fff !default;
-        $menuTitleHover: #000 !default;
-        $menuActiveBefore: #4091f7 !default;
+        $subMenuActiveText: #e0fdf8 !default;
+        $menuBg: #0d2a3a !default;
+        $menuHover: rgba(45, 212, 191, 0.10) !default;
+        $subMenuBg: #091e2e !default;
+        $subMenuActiveBg: rgba(45, 212, 191, 0.14) !default;
+        $menuText: rgba(224, 253, 248, 0.58) !default;
+        $sidebarLogo: #0d2a3a !default;
+        $menuTitleHover: #e0fdf8 !default;
+        $menuActiveBefore: #2dd4bf !default;
       `
         }
       }
@@ -54,13 +54,14 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
       // 端口号
       port: VITE_PORT,
       host: "0.0.0.0",
-      https: true,
+      https: false,
       // 本地跨域代理 https://cn.vitejs.dev/config/server-options.html#server-proxy
       proxy: createProxy(VITE_PROXY),
       // 预热文件以提前转换和缓存结果，降低启动期间的初始页面加载时长并防止转换瀑布
       warmup: {
         clientFiles: ["./index.html", "./src/{views,components}/*"]
-      }
+      },
+      allowedHosts: ["77qc340868sd.vicp.fun"]
     },
     plugins: getPluginsList(VITE_CDN, VITE_COMPRESSION),
     // https://cn.vitejs.dev/config/dep-optimization-options.html#dep-optimization-options

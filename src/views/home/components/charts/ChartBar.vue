@@ -3,15 +3,11 @@ import { useDark, useECharts } from "@pureadmin/utils";
 import { type PropType, ref, computed, watch, nextTick } from "vue";
 
 const props = defineProps({
-  nurseData: {
+  thisWeekData: {
     type: Array as PropType<Array<number>>,
     default: () => []
   },
-  doctorData: {
-    type: Array as PropType<Array<number>>,
-    default: () => []
-  },
-  finalData: {
+  lastWeekData: {
     type: Array as PropType<Array<number>>,
     default: () => []
   }
@@ -29,10 +25,10 @@ const { setOptions } = useECharts(chartRef, {
 watch(
   () => props,
   async () => {
-    await nextTick(); // 确保DOM更新完成后再执行
+    await nextTick();
     setOptions({
       container: ".bar-card",
-      color: ["#41b6ff", "#e85f33"],
+      color: ["#2dd4bf", "#38bdf8"],
       tooltip: {
         trigger: "axis",
         axisPointer: {
@@ -45,7 +41,7 @@ watch(
         right: 0
       },
       legend: {
-        data: ["护士质控数量", "医生质控数量", "终末质控数量"],
+        data: ["本周就诊", "上周就诊"],
         textStyle: {
           color: "#606266",
           fontSize: "0.875rem"
@@ -67,45 +63,35 @@ watch(
       yAxis: [
         {
           type: "value",
+          name: "人次",
           axisLabel: {
             fontSize: "0.875rem"
           },
           splitLine: {
-            show: false // 去网格线
+            show: false
           }
-          // name: "单位: 个"
         }
       ],
       series: [
         {
-          name: "护士质控数量",
+          name: "本周就诊",
           type: "bar",
-          barWidth: 10,
+          barWidth: 14,
           itemStyle: {
-            color: "#e86033aa",
+            color: "#2dd4bf",
             borderRadius: [10, 10, 0, 0]
           },
-          data: props.nurseData
+          data: props.thisWeekData
         },
         {
-          name: "医生质控数量",
+          name: "上周就诊",
           type: "bar",
-          barWidth: 10,
+          barWidth: 14,
           itemStyle: {
-            color: "#41b6ff",
+            color: "#38bdf8aa",
             borderRadius: [10, 10, 0, 0]
           },
-          data: props.doctorData
-        },
-        {
-          name: "终末质控数量",
-          type: "bar",
-          barWidth: 10,
-          itemStyle: {
-            color: "#e86033ce",
-            borderRadius: [10, 10, 0, 0]
-          },
-          data: props.finalData
+          data: props.lastWeekData
         }
       ]
     });

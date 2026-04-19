@@ -27,7 +27,12 @@ const feeForm = reactive({
 
 // 表格列定义
 const columns = ref([
-  { label: "默认添加到处方", prop: "isDefault", minWidth: 150, slot: "default" },
+  {
+    label: "默认添加到处方",
+    prop: "isDefault",
+    minWidth: 150,
+    slot: "default"
+  },
   { label: "项目名称", prop: "name", minWidth: 200 },
   { label: "价格", prop: "price", minWidth: 150, slot: "price" },
   { label: "成本价", prop: "costPrice", minWidth: 150, slot: "costPrice" },
@@ -144,7 +149,9 @@ const handleSave = () => {
   }
 
   // TODO: 调用后端接口保存
-  ElMessage.success(dialogTitle.value === "新增附加费用" ? "添加成功" : "编辑成功");
+  ElMessage.success(
+    dialogTitle.value === "新增附加费用" ? "添加成功" : "编辑成功"
+  );
   dialogVisible.value = false;
   handleQuery();
 };
@@ -162,11 +169,13 @@ const handleToggleStatus = (row: any) => {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
     type: "warning"
-  }).then(() => {
-    // TODO: 调用后端接口
-    row.status = !row.status;
-    ElMessage.success(`${action}成功`);
-  }).catch(() => {});
+  })
+    .then(() => {
+      // TODO: 调用后端接口
+      row.status = !row.status;
+      ElMessage.success(`${action}成功`);
+    })
+    .catch(() => {});
 };
 
 // Lifecycle

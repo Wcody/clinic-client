@@ -233,8 +233,8 @@
           <!-- 动态渲染证型列表 -->
           <div
             v-for="(treatment, index) in diseaseDetail?.data?.cure?.data || []"
-            :key="treatment.id"
             :id="`treatment-${treatment.id}`"
+            :key="treatment.id"
             class="bg-white rounded shadow-sm border border-gray-200 scroll-mt-32"
           >
             <button
@@ -363,8 +363,8 @@
           <!-- 动态渲染名医经验方列表 -->
           <div
             v-for="(expert, index) in diseaseDetail?.data?.exp?.data || []"
-            :key="expert.id"
             :id="`prescription-${expert.id}`"
+            :key="expert.id"
             class="bg-white rounded shadow-sm border border-gray-200 scroll-mt-32"
           >
             <button
