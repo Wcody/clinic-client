@@ -146,7 +146,6 @@ const transitionMain = defineComponent({
                   >
                     <component
                       :is="Comp"
-                      :key="fullPath"
                       :frameInfo="frameInfo"
                       class="main-content"
                     />
@@ -154,7 +153,6 @@ const transitionMain = defineComponent({
                   <component
                     :is="Comp"
                     v-else
-                    :key="fullPath"
                     :frameInfo="frameInfo"
                     class="main-content"
                   />
@@ -170,7 +168,6 @@ const transitionMain = defineComponent({
                 >
                   <component
                     :is="Comp"
-                    :key="fullPath"
                     :frameInfo="frameInfo"
                     class="main-content"
                   />
@@ -178,7 +175,6 @@ const transitionMain = defineComponent({
                 <component
                   :is="Comp"
                   v-else
-                  :key="fullPath"
                   :frameInfo="frameInfo"
                   class="main-content"
                 />

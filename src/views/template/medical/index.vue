@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Search } from "@element-plus/icons-vue";
 import {
@@ -21,8 +21,11 @@ const formLoading = ref(false);
 const treeData = ref<any[]>([]);
 const selectedId = ref("");
 const isNew = ref(false);
-const isCategoryNode = ref(false); // 标记当前选中的是否为目录节点
+const isCategoryNode = ref(false);
+const isEditing = ref(false);
+const isLoading = ref(false);
 const searchKeyword = ref("");
+const isDirty = ref(false);
 
 const form = reactive<BQMedicalRecordTemplateEntityType>(
   getMedicalRecordTemplateEntityDefault()
@@ -31,6 +34,11 @@ const metaInfo = reactive({ updatedTime: "", updatedBy: "" });
 
 // ─── 计算属性 ─────────────────────────────────────────────────
 const hasSelected = computed(() => !!selectedId.value || isNew.value);
+const canSave = computed(() => hasSelected.value && !isCategoryNode.value);
+const canDelete = computed(() => !!selectedId.value && !isNew.value && !isCategoryNode.value);
+const canCancel = computed(() => hasSelected.value && isDirty.value);
+const canEdit = computed(() => !!selectedId.value && !isNew.value && !isCategoryNode.value);
+const formDisabled = computed(() => !isNew.value && !isEditing.value);
 
 // 过滤后的树形数据（本地搜索）
 const filteredTreeData = computed(() => {
@@ -40,26 +48,17 @@ const filteredTreeData = computed(() => {
 
   const keyword = searchKeyword.value.toLowerCase().trim();
 
-  // 递归过滤树形节点
   const filterNodes = (nodes: any[]): any[] => {
     return nodes
       .map(node => {
-        // 深拷贝节点，避免修改原数据
         const newNode = { ...node };
-
-        // 如果有子节点，先递归过滤子节点
         if (node.children && node.children.length > 0) {
           newNode.children = filterNodes(node.children);
         }
-
-        // 判断当前节点是否匹配
         const nameMatch = node.name?.toLowerCase().includes(keyword);
-
-        // 如果当前节点匹配，或者有匹配的子节点，则保留
         if (nameMatch || (newNode.children && newNode.children.length > 0)) {
           return newNode;
         }
-
         return null;
       })
       .filter(node => node !== null);
@@ -73,10 +72,8 @@ const loadTreeData = async () => {
   listLoading.value = true;
   try {
     const res: any = await getMedicalRecordTemplateTreeApi();
-    console.log("树形数据响应:", res);
     if (res.code === 0 && res.data) {
       treeData.value = res.data;
-      console.log("树形数据加载成功，根节点数:", treeData.value.length);
     } else {
       ElMessage.error(res.errMsg || res.message || "加载失败");
     }
@@ -88,59 +85,115 @@ const loadTreeData = async () => {
   }
 };
 
-// 加载模板详情
 const loadTemplateDetail = async (templateId: string) => {
+  isLoading.value = true;
   try {
     const res: any = await getMedicalRecordTemplateApi(templateId);
     if (res.code === 0 && res.data) {
       Object.assign(form, getMedicalRecordTemplateEntityDefault(res.data));
       metaInfo.updatedTime = res.data.updatedTime ?? res.data.createdTime ?? "";
       metaInfo.updatedBy = res.data.updatedBy ?? res.data.createdBy ?? "";
+      isDirty.value = false;
     } else {
       ElMessage.error(res.errMsg || res.message || "加载详情失败");
     }
   } catch (error) {
     console.error("加载模板详情失败:", error);
     ElMessage.error("加载模板详情失败");
+  } finally {
+    isLoading.value = false;
   }
 };
 
 // ─── 操作 ─────────────────────────────────────────────────────
 const handleNodeClick = async (data: any) => {
-  console.log("点击节点:", data);
+  const targetId = String(data.id);
 
-  // 如果是目录节点
-  if (data.hasCategory) {
-    selectedId.value = String(data.id);
-    isNew.value = false;
-    isCategoryNode.value = true;
+  // 如果点击的是当前选中节点，不做处理
+  if (targetId === selectedId.value && !isNew.value) return;
 
-    // 加载目录信息
+  // 如果当前有未保存的修改（编辑模式或新增模式），先提示保存
+  const wasEditing = isNew.value || isEditing.value;
+  if (wasEditing && isDirty.value) {
     try {
-      const res: any = await getMedicalRecordTemplateApi(String(data.id));
-      if (res.code === 0 && res.data) {
-        Object.assign(form, getMedicalRecordTemplateEntityDefault(res.data));
-        metaInfo.updatedTime =
-          res.data.updatedTime ?? res.data.createdTime ?? "";
-        metaInfo.updatedBy = res.data.updatedBy ?? res.data.createdBy ?? "";
+      await ElMessageBox.confirm("当前有未保存的修改，是否保存？", "提示", {
+        confirmButtonText: "保存",
+        cancelButtonText: "不保存",
+        type: "warning"
+      });
+      await handleSave();
+      // 保存后继续执行加载新节点
+    } catch {
+      // 用户选择"不保存"：恢复到编辑前的状态，停留当前节点
+      if (isEditing.value && selectedId.value) {
+        isEditing.value = false;
+        isDirty.value = false;
+        await loadTemplateDetail(selectedId.value);
+      } else if (isNew.value) {
+        isNew.value = false;
+        isEditing.value = false;
+        isDirty.value = false;
+        Object.assign(form, getMedicalRecordTemplateEntityDefault());
+        metaInfo.updatedTime = "";
+        metaInfo.updatedBy = "";
       }
-    } catch (error) {
-      console.error("加载目录信息失败:", error);
+      // 停留当前节点，不执行切换
+      return;
     }
-    return;
   }
 
-  // 如果是模板节点
-  selectedId.value = String(data.id);
+  // 切换到新节点
+  selectedId.value = targetId;
+  isCategoryNode.value = !!data.hasCategory;
   isNew.value = false;
-  isCategoryNode.value = false;
-  await loadTemplateDetail(String(data.id));
+  isEditing.value = false;
+  isDirty.value = false;
+
+  if (data.hasCategory) {
+    Object.assign(form, getMedicalRecordTemplateEntityDefault({ ...data }));
+    metaInfo.updatedTime = data.updatedTime ?? data.createdTime ?? "";
+    metaInfo.updatedBy = data.updatedBy ?? data.createdBy ?? "";
+  } else {
+    await loadTemplateDetail(String(data.id));
+  }
 };
 
-const handleAdd = () => {
+const handleAdd = async () => {
+  // 如果当前有未保存的修改（编辑模式或新增模式），先提示保存
+  const wasEditing = isNew.value || isEditing.value;
+  if (wasEditing && isDirty.value) {
+    try {
+      await ElMessageBox.confirm("当前有未保存的修改，是否保存？", "提示", {
+        confirmButtonText: "保存",
+        cancelButtonText: "不保存",
+        type: "warning"
+      });
+      await handleSave();
+      // 保存后继续执行新增
+    } catch {
+      // 用户选择"不保存"：恢复到编辑前的状态，停留当前状态
+      if (isEditing.value && selectedId.value) {
+        isEditing.value = false;
+        isDirty.value = false;
+        await loadTemplateDetail(selectedId.value);
+      } else if (isNew.value) {
+        isNew.value = false;
+        isEditing.value = false;
+        isDirty.value = false;
+        Object.assign(form, getMedicalRecordTemplateEntityDefault());
+        metaInfo.updatedTime = "";
+        metaInfo.updatedBy = "";
+      }
+      // 停留当前状态，不执行新增
+      return;
+    }
+  }
+
   selectedId.value = "";
   isNew.value = true;
   isCategoryNode.value = false;
+  isEditing.value = false;
+  isDirty.value = false;
   Object.assign(form, getMedicalRecordTemplateEntityDefault());
   metaInfo.updatedTime = "";
   metaInfo.updatedBy = "";
@@ -155,33 +208,26 @@ const handleSave = async () => {
   formLoading.value = true;
   try {
     const now = new Date().toISOString();
-    let templateId = (form as any).id;
+    let savedId = (form as any).id;
 
     if (isNew.value) {
-      // 新增
-      const submitData = {
-        ...form,
-        createdTime: now,
-        updatedTime: now
-      };
-
+      const submitData = { ...form, createdTime: now, updatedTime: now };
       const res: any = await addMedicalRecordTemplateApi(submitData);
       if (res.code === 0 && res.data) {
-        templateId = res.data.id;
+        savedId = res.data.id;
+        isNew.value = false;
+        selectedId.value = String(savedId);
+        isEditing.value = false;
         ElMessage.success("保存成功");
       } else {
         ElMessage.error(res.errMsg || res.message || "保存失败");
         return;
       }
     } else {
-      // 更新
-      const submitData = {
-        ...form,
-        updatedTime: now
-      };
-
+      const submitData = { ...form, updatedTime: now };
       const res: any = await updateMedicalRecordTemplateApi(submitData);
-      if (res.code === 0 && res.data) {
+      if (res.code === 0) {
+        isEditing.value = false;
         ElMessage.success("保存成功");
       } else {
         ElMessage.error(res.errMsg || res.message || "保存失败");
@@ -189,7 +235,7 @@ const handleSave = async () => {
       }
     }
 
-    // 重新加载树形数据
+    isDirty.value = false;
     await loadTreeData();
   } catch (error) {
     console.error("保存失败:", error);
@@ -203,46 +249,39 @@ const handleCancel = () => {
   if (isNew.value) {
     isNew.value = false;
     isCategoryNode.value = false;
-    // 取消新增时，清空表单
     Object.assign(form, getMedicalRecordTemplateEntityDefault());
     metaInfo.updatedTime = "";
     metaInfo.updatedBy = "";
-  } else {
-    // 取消编辑时，重新加载当前选中节点的详情
-    if (selectedId.value && !isCategoryNode.value) {
-      loadTemplateDetail(selectedId.value);
-    }
+  } else if (selectedId.value) {
+    loadTemplateDetail(selectedId.value);
   }
+  isEditing.value = false;
+  isDirty.value = false;
 };
 
-// 停用/启用状态变化处理
+const handleEdit = () => {
+  if (!canEdit.value) return;
+  isEditing.value = true;
+};
+
 const handleStatusChange = async (value: boolean) => {
-  if (isNew.value || !selectedId.value) {
-    return;
-  }
+  if (isNew.value || !selectedId.value) return;
 
   try {
     const now = new Date().toISOString();
-    const submitData = {
-      ...(form as any),
-      status: value,
-      updatedTime: now
-    };
-
+    const submitData = { ...(form as any), status: value, updatedTime: now };
     const res: any = await updateMedicalRecordTemplateApi(submitData);
     if (res.code === 0) {
       ElMessage.success(value ? "已启用" : "已停用");
-      // 重新加载树形数据以更新显示
+      isDirty.value = false;
       await loadTreeData();
     } else {
       ElMessage.error(res.errMsg || res.message || "状态更新失败");
-      // 恢复原状态
       form.status = !value;
     }
   } catch (error) {
     console.error("状态更新失败:", error);
     ElMessage.error("状态更新失败");
-    // 恢复原状态
     form.status = !value;
   }
 };
@@ -250,37 +289,46 @@ const handleStatusChange = async (value: boolean) => {
 const handleDelete = async () => {
   if (!selectedId.value || isNew.value) return;
 
-  await ElMessageBox.confirm(
-    isCategoryNode.value
-      ? "确认删除该目录？删除后不可恢复。"
-      : "确认删除该模板？删除后不可恢复。",
-    "提示",
-    {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning"
-    }
-  );
-
   try {
+    await ElMessageBox.confirm(
+      isCategoryNode.value ? "确认删除该目录？删除后不可恢复。" : "确认删除该模板？删除后不可恢复。",
+      "提示",
+      { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
+    );
+
     const res: any = await deleteMedicalRecordTemplateApi(selectedId.value);
     if (res.code === 0) {
       ElMessage.success("删除成功");
       selectedId.value = "";
       isNew.value = false;
       isCategoryNode.value = false;
+      isEditing.value = false;
+      isDirty.value = false;
+      Object.assign(form, getMedicalRecordTemplateEntityDefault());
       metaInfo.updatedTime = "";
       metaInfo.updatedBy = "";
-      // 重新加载树形数据
       await loadTreeData();
     } else {
       ElMessage.error(res.errMsg || res.message || "删除失败");
     }
   } catch (error) {
-    console.error("删除失败:", error);
-    ElMessage.error("删除失败");
+    if ((error as any) !== "cancel") {
+      console.error("删除失败:", error);
+      ElMessage.error("删除失败");
+    }
   }
 };
+
+// 监听表单变化，标记脏值
+watch(
+  () => ({ ...form }),
+  () => {
+    if (hasSelected.value && !isCategoryNode.value && !isLoading.value) {
+      isDirty.value = true;
+    }
+  },
+  { deep: true }
+);
 
 onMounted(() => {
   loadTreeData();
@@ -305,6 +353,7 @@ onMounted(() => {
           clearable
           size="small"
           class="flex-1"
+          :disabled="isNew || isEditing"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -313,7 +362,7 @@ onMounted(() => {
       </div>
 
       <!-- 树形列表 -->
-      <div v-loading="listLoading" class="flex-1 overflow-y-auto py-1">
+      <div v-loading="listLoading" class="flex-1 overflow-y-auto py-1" :class="{ 'pointer-events-none opacity-60': isNew || isEditing }">
         <el-empty
           v-if="filteredTreeData.length === 0"
           description="暂无数据"
@@ -354,34 +403,26 @@ onMounted(() => {
       <div
         class="h-[44px] shrink-0 flex items-center justify-between px-4 border-b border-[var(--el-border-color-light)]"
       >
-        <el-button type="primary" size="small" @click="handleAdd"
-          >+ 新增</el-button
-        >
+        <el-button type="primary" size="small" @click="handleAdd">+ 新增</el-button>
         <div class="flex items-center gap-2">
-          <el-button
-            type="primary"
-            size="small"
-            :loading="formLoading"
-            :disabled="!hasSelected"
-            @click="handleSave"
-          >
-            保存
-          </el-button>
-          <el-button
-            size="small"
-            :disabled="!hasSelected"
-            @click="handleCancel"
-          >
-            取消
-          </el-button>
-          <el-button
-            type="danger"
-            size="small"
-            :disabled="isNew || !selectedId"
-            @click="handleDelete"
-          >
-            删除
-          </el-button>
+          <!-- 修改模式/新增模式：显示保存和取消 -->
+          <template v-if="isEditing || isNew">
+            <el-button type="primary" size="small" :loading="formLoading" @click="handleSave">
+              保存
+            </el-button>
+            <el-button size="small" @click="handleCancel">
+              取消
+            </el-button>
+          </template>
+          <!-- 默认模式：显示修改和删除 -->
+          <template v-else>
+            <el-button type="primary" size="small" :disabled="!canEdit" @click="handleEdit">
+              修改
+            </el-button>
+            <el-button type="danger" size="small" :disabled="!canDelete" @click="handleDelete">
+              删除
+            </el-button>
+          </template>
         </div>
       </div>
 
@@ -408,12 +449,12 @@ onMounted(() => {
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="模板名称">
-                <el-input v-model="form.name" placeholder="请输入模板名称" />
+                <el-input v-model="form.name" placeholder="请输入模板名称" :disabled="formDisabled" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="模板类别">
-                <el-select v-model="form.type" style="width: 100%">
+                <el-select v-model="form.type" style="width: 100%" :disabled="formDisabled">
                   <el-option label="个人" :value="1" />
                   <el-option label="诊所" :value="2" />
                 </el-select>
@@ -423,110 +464,49 @@ onMounted(() => {
 
           <!-- 病历各段 -->
           <el-form-item label="主诉">
-            <el-input
-              v-model="form.complaint"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入主诉"
-            />
+            <el-input v-model="form.complaint" type="textarea" :rows="2" placeholder="请输入主诉" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="现病史">
-            <el-input
-              v-model="form.historyOfPresentIllness"
-              type="textarea"
-              :rows="4"
-              placeholder="请输入现病史"
-            />
+            <el-input v-model="form.historyOfPresentIllness" type="textarea" :rows="4" placeholder="请输入现病史" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="既往史">
-            <el-input
-              v-model="form.pastHistory"
-              type="textarea"
-              :rows="3"
-              placeholder="请输入既往史"
-            />
+            <el-input v-model="form.pastHistory" type="textarea" :rows="3" placeholder="请输入既往史" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="个人史">
-            <el-input
-              v-model="form.personalHistory"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入个人史"
-            />
+            <el-input v-model="form.personalHistory" type="textarea" :rows="2" placeholder="请输入个人史" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="婚育史">
-            <el-input
-              v-model="form.obstericalHistory"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入婚育史"
-            />
+            <el-input v-model="form.obstericalHistory" type="textarea" :rows="2" placeholder="请输入婚育史" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="家族史">
-            <el-input
-              v-model="form.familyHistory"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入家族史"
-            />
+            <el-input v-model="form.familyHistory" type="textarea" :rows="2" placeholder="请输入家族史" :disabled="formDisabled" />
           </el-form-item>
 
           <!-- 体格检查 -->
           <el-form-item label="体格检查">
             <div class="flex items-center flex-wrap gap-x-2 gap-y-1">
               <span class="vital-label">体温/T</span>
-              <el-input
-                v-model.number="form.bodyTemperature"
-                class="vital-input"
-                type="number"
-                step="0.1"
-              />
+              <el-input v-model.number="form.bodyTemperature" class="vital-input" type="number" step="0.1" :disabled="formDisabled" />
               <span class="vital-unit">℃</span>
               <span class="vital-label">心率/P</span>
-              <el-input
-                v-model.number="form.heartRate"
-                class="vital-input"
-                type="number"
-              />
+              <el-input v-model.number="form.heartRate" class="vital-input" type="number" :disabled="formDisabled" />
               <span class="vital-unit">次/分</span>
               <span class="vital-label">呼吸/R</span>
-              <el-input
-                v-model.number="form.breathRate"
-                class="vital-input"
-                type="number"
-              />
+              <el-input v-model.number="form.breathRate" class="vital-input" type="number" :disabled="formDisabled" />
               <span class="vital-unit">次/分</span>
               <span class="vital-label">血压</span>
-              <el-input
-                v-model.number="form.bloodPressureHight"
-                class="vital-input-bp"
-                type="number"
-              />
+              <el-input v-model.number="form.bloodPressureHight" class="vital-input-bp" type="number" :disabled="formDisabled" />
               <span class="vital-unit">/</span>
-              <el-input
-                v-model.number="form.bloodPressureLow"
-                class="vital-input-bp"
-                type="number"
-              />
+              <el-input v-model.number="form.bloodPressureLow" class="vital-input-bp" type="number" :disabled="formDisabled" />
               <span class="vital-unit">mmHg</span>
             </div>
           </el-form-item>
 
           <el-form-item label="其他辅助检查">
-            <el-input
-              v-model="form.otherExamine"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入其他辅助检查"
-            />
+            <el-input v-model="form.otherExamine" type="textarea" :rows="2" placeholder="请输入其他辅助检查" :disabled="formDisabled" />
           </el-form-item>
           <el-form-item label="治疗建议">
-            <el-input
-              v-model="form.treatmentRecommendation"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入治疗建议"
-            />
+            <el-input v-model="form.treatmentRecommendation" type="textarea" :rows="2" placeholder="请输入治疗建议" :disabled="formDisabled" />
           </el-form-item>
 
           <!-- 底部状态栏 -->

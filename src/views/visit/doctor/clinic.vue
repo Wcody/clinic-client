@@ -11,14 +11,6 @@ import { Close, Plus, Check } from "@element-plus/icons-vue";
 import BqPatientBasicInfo from "@/components/BqPatientBasicInfo";
 import { BqDiagnosisSelector } from "@/components/BqDiagnosisSelector";
 import {
-  BqMedicineSelector,
-  type MedicineItem
-} from "@/components/BqMedicineSelector";
-import { BqExamineItemSelector } from "@/components/BqExamineItemSelector";
-import { BqTreatmentItemSelector } from "@/components/BqTreatmentItemSelector";
-import type { BQExamineItemEntityType } from "@/api/pharmacy/examine";
-import type { BQTreatmentItemEntityType } from "@/api/pharmacy/treatment";
-import {
   getMedicalDictionaryListApi,
   type BQMedicalDictionaryEntityType
 } from "@/api/cm/medicalDictionary";
@@ -50,21 +42,32 @@ import {
   FeeStatus
 } from "@/api/visit/register";
 import type { BQMedicalRecordTemplateEntityType } from "@/api/cm/medicalRecordTemplate";
-import type { BQPrescriptionTemplateDetailEntityType } from "@/api/cm/prescriptionTemplate";
+import type { BQPrescriptionTemplateDetailEntityType, BQPrescriptionTemplateEntityType } from "@/api/cm/prescriptionTemplate";
+import { getDrugsByIdsApi } from "@/api/pharmacy/drug";
 import { ElMessage, ElMessageBox } from "element-plus";
 import HistoryMedicalRecord from "./comp/HistoryMedicalRecord.vue";
 import MedicalRecordTemplate from "./comp/MedicalRecordTemplate.vue";
 import HistoryPrescription from "./comp/HistoryPrescription.vue";
 import PrescriptionTemplate from "./comp/PrescriptionTemplate.vue";
-import { useRoute } from "vue-router";
+import MedicalRecordForm from "./comp/MedicalRecordForm.vue";
+import WesternPrescription from "./comp/WesternPrescription.vue";
+import ChinesePrescription from "./comp/ChinesePrescription.vue";
+import ExamTreatmentPrescription from "./comp/ExamTreatmentPrescription.vue";
+import { useRoute, useRouter } from "vue-router";
 import { useUserStoreHook } from "@/store/modules/user";
+import type {
+  PrescriptionItem,
+  PrescriptionGroup,
+  PrescriptionTypeData
+} from "./prescriptionTypes";
 
 defineOptions({
-  name: "DoctorWorkbench"
+  name: "WorkDoctor"
 });
 
 // 获取路由传参
 const route = useRoute();
+const router = useRouter();
 const routeRegId = route.query.regId as unknown as number;
 const routePatientId = route.query.patientId as unknown as number;
 
@@ -94,7 +97,6 @@ const clearClinicCache = () => {
   localStorage.removeItem(getClinicCacheKey());
 };
 
-
 const activeTab = ref("medical-record");
 
 // ==================== 基本信息组件 ref（所有页签共用同一份数据）====================
@@ -103,8 +105,8 @@ const basicInfoRef = ref<InstanceType<typeof BqPatientBasicInfo>>();
 // ==================== 当前接诊状态 ====================
 const currentRegId = ref<number | undefined>(undefined);
 const currentMedicalRecordId = ref<number | undefined>(undefined);
-const currentRegStatus = ref<string>("");
-const currentRegStatusFee = ref<string>("");
+const currentRegStatus = ref<string | null>(null);
+const currentRegStatusFee = ref<string | null>(null);
 
 // ==================== 确保患者和挂号记录存在 ====================
 const ensurePatientAndRegistration = async (): Promise<{
@@ -119,7 +121,6 @@ const ensurePatientAndRegistration = async (): Promise<{
 
   let patientId = form.id;
 
-  // 没有患者ID时，根据患者信息创建患者并持久化
   if (!patientId) {
     try {
       const res = await savePatientApi({
@@ -149,12 +150,10 @@ const ensurePatientAndRegistration = async (): Promise<{
     }
   }
 
-  // 已有挂号ID直接返回
   if (currentRegId.value) {
     return { patientId, regId: currentRegId.value };
   }
 
-  // 没有挂号ID时，根据患者信息生成挂号记录并设为接诊中（已接诊）
   try {
     const res = await saveRegistrationApi({
       registration: {
@@ -183,31 +182,38 @@ const ensurePatientAndRegistration = async (): Promise<{
   }
 };
 
-// ==================== 患者选择回调（同一时间同一医生只允许接诊一个患者）====================
-const onPatientSelect = async (user: any) => {
+// ==================== 患者选择回调 ====================
+const onBeforePatientSelect = async (user: any) => {
   if (currentRegId.value) {
+    // 确认之前先获取当前患者ID
+    const currentPatientId = basicInfoRef.value?.form?.id;
     try {
       await ElMessageBox.confirm(
-        "当前已有正在接诊的患者，是否结束当前就诊并接诊新患者？",
+        "当前已有正在接诊的患者，是否切换？",
         "提示",
         { confirmButtonText: "确认", cancelButtonText: "取消", type: "warning" }
       );
-      // 结束就诊成功后，清空当前接诊状态和处方数据
-      clearClinicCache();
+      // 确认后，保存当前状态到缓存
+      saveClinicCache(currentRegId.value, currentPatientId);
+      // 重置状态
       currentRegId.value = undefined;
       currentMedicalRecordId.value = undefined;
-      // 清空所有处方类型的处方组ID
       Object.values(medicalOrderForm.prescriptionData).forEach(typeData => {
         typeData.groups.forEach(g => (g.prescId = undefined));
       });
       medicalRecordForm.diagnoses = [];
-      ElMessage.success("已结束就诊");
+      // 确认后应用新患者数据
+      basicInfoRef.value?.confirmPatientSelect(user);
     } catch {
-      return;
+      // 取消，不做任何操作
     }
+  } else {
+    // 没有正在接诊的患者，直接应用
+    basicInfoRef.value?.confirmPatientSelect(user);
   }
+};
 
-  // 将患者历史信息同步到病历表单
+const onPatientSelect = async (user: any) => {
   medicalRecordForm.pastHistory = user.pastHistory || "";
   medicalRecordForm.personalHistory = user.personalHistory || "";
   medicalRecordForm.marriageHistory = user.obstericalHistory || "";
@@ -220,7 +226,49 @@ const onPatientSelect = async (user: any) => {
   ElMessage.success(`已选择患者: ${user.name}`);
 };
 
-// 基本信息组件保存事件：将修改的患者信息持久化到后端
+const onReset = () => {
+  // 重置所有状态和数据
+  currentRegId.value = undefined;
+  currentMedicalRecordId.value = undefined;
+  currentRegStatus.value = null;
+  currentRegStatusFee.value = null;
+  forceShowSaveBtn.value = false;
+  // 重置病历表单
+  medicalRecordForm.chiefComplaint = "";
+  medicalRecordForm.presentIllness = "";
+  medicalRecordForm.pastHistory = "";
+  medicalRecordForm.allergyHistory = 0;
+  medicalRecordForm.allergyDetail = "";
+  medicalRecordForm.personalHistory = "";
+  medicalRecordForm.marriageHistory = "";
+  medicalRecordForm.familyHistory = "";
+  medicalRecordForm.travelHistory = "";
+  medicalRecordForm.contactHistory = "";
+  medicalRecordForm.temperature = "";
+  medicalRecordForm.heartRate = "";
+  medicalRecordForm.respiration = "";
+  medicalRecordForm.bloodPressureSystolic = "";
+  medicalRecordForm.bloodPressureDiastolic = "";
+  medicalRecordForm.otherExamination = "";
+  medicalRecordForm.diagnoses = [];
+  medicalRecordForm.treatmentAdvice = "";
+  // 重置处方数据
+  Object.values(medicalOrderForm.prescriptionData).forEach(typeData => {
+    typeData.groups = [{
+      name: typeData.groups[0]?.name || "处方1",
+      prescType: typeData.groups[0]?.prescType || 1,
+      items: []
+    }];
+    typeData.currentGroup = 0;
+  });
+  // 重置附加费
+  medicalOrderForm.additionalFees = [];
+  // 清除缓存
+  clearClinicCache();
+  // 路由跳转清空URL参数
+  router.push("/visit/doctor/clinic");
+};
+
 const onBasicInfoSave = async (formData: any) => {
   if (!formData.id) return;
   try {
@@ -247,7 +295,6 @@ const onBasicInfoSave = async (formData: any) => {
 };
 
 // ==================== 病历信息表单 ====================
-const medicalRecordFormRef = ref();
 const medicalRecordForm = reactive({
   chiefComplaint: "",
   presentIllness: "",
@@ -269,14 +316,24 @@ const medicalRecordForm = reactive({
   treatmentAdvice: ""
 });
 
-// ==================== 诊断选择 ====================
+// ==================== 诊断信息面板 ====================
+const diagnosisCollapsed = ref(false);
 const diagnosisInputValue = ref("");
 
+const diagnosisHint = computed(() =>
+  medicalRecordForm.diagnoses.map(d => d.diagnosisName).join("、")
+);
+
 const handleDiagnosisSelect = (diagnosis: BQDiagnosisDictEntityType) => {
-  const exists = medicalRecordForm.diagnoses.some(d => d.id === diagnosis.id);
-  if (!exists) {
-    medicalRecordForm.diagnoses.push(diagnosis);
+  const exists = medicalRecordForm.diagnoses.some(
+    d => d.diagnosisName === diagnosis.diagnosisName
+  );
+  if (exists) {
+    ElMessage.warning("该诊断已在列表中");
+    diagnosisInputValue.value = "";
+    return;
   }
+  medicalRecordForm.diagnoses.push(diagnosis);
   diagnosisInputValue.value = "";
 };
 
@@ -284,10 +341,7 @@ const removeDiagnosis = (index: number) => {
   medicalRecordForm.diagnoses.splice(index, 1);
 };
 
-// 医嘱中的诊断（从病历同步，两个页签共享同一份）
-const medicalOrderDiagnoses = computed(() => medicalRecordForm.diagnoses);
-
-// ==================== 历史病历弹窗组件 ====================
+// ==================== 历史病历弹窗 ====================
 const historyMedicalRecordRef = ref<InstanceType<typeof HistoryMedicalRecord>>();
 
 const handleViewHistory = () => {
@@ -298,7 +352,7 @@ const handleViewHistory = () => {
   historyMedicalRecordRef.value?.open();
 };
 
-// ==================== 历史处方弹窗组件 ====================
+// ==================== 历史处方弹窗 ====================
 const historyPrescriptionRef = ref<InstanceType<typeof HistoryPrescription>>();
 
 const handleViewPrescriptionHistory = () => {
@@ -309,7 +363,7 @@ const handleViewPrescriptionHistory = () => {
   historyPrescriptionRef.value?.open();
 };
 
-// ==================== 病历模板弹窗组件 ====================
+// ==================== 病历模板 ====================
 const medicalRecordTemplateRef =
   ref<InstanceType<typeof MedicalRecordTemplate>>();
 
@@ -339,17 +393,188 @@ const onMedicalTemplateConfirm = (
   medicalRecordForm.treatmentAdvice = detail.treatmentRecommendation || "";
 };
 
-// ==================== 处方模板弹窗组件 ====================
+// ==================== 处方模板 ====================
 const prescriptionTemplateRef =
   ref<InstanceType<typeof PrescriptionTemplate>>();
+const chinesePrescriptionRef = ref<InstanceType<typeof ChinesePrescription>>();
 
 const handleCallTemplate = () => {
   prescriptionTemplateRef.value?.open();
 };
 
-const onPrescriptionTemplateConfirm = (
-  details: BQPrescriptionTemplateDetailEntityType[]
+// ==================== 药品信息补全函数 ====================
+
+// 补全处方模板数据：以药库为准
+const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
+  console.log("supplementDrugInfoFromTemplate called, items:", JSON.stringify(items, null, 2));
+  const drugIds = items.map(item => item.itemId).filter(Boolean) as number[];
+  console.log("drugIds:", drugIds);
+  if (drugIds.length === 0) return;
+
+  const drugRes = await getDrugsByIdsApi(drugIds);
+  if (!drugRes?.data) return;
+
+  const drugMap = new Map(drugRes.data.map((d: any) => [d.id, d]));
+
+  items.forEach(item => {
+    const drug = drugMap.get(item.itemId);
+    if (!drug) return;
+
+    // 以药库为准
+    if (drug.name) item.itemName = drug.name;
+    if (drug.specification) item.spec = drug.specification;
+    if (drug.unitId) item.unitId = drug.unitId;
+    if (drug.useWay) item.useWay = drug.useWay;
+    if (drug.frequency) item.frequency = drug.frequency;
+    if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
+    if (drug.prescriptionUnit) item.prescriptionUnit = drug.prescriptionUnit;
+    if (drug.wholesalePrice) item.wholesalePrice = drug.wholesalePrice;
+    if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
+    if (drug.conversionValue) item.conversionValue = drug.conversionValue;
+    if (drug.decoWay) item.decoWay = drug.decoWay;
+    if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
+
+    // 根据 defaultSaleType 设置默认单位和单价：0整卖用药库大单位，1散卖用药库小单位
+    const saleType = Number(drug.defaultSaleType);
+    if (saleType === 1 && drug.prescriptionUnit) {
+      // 散卖：用小单位
+      item.unit = drug.prescriptionUnit;
+      item.unitId = unitOptions.value.find(o => o.name === drug.prescriptionUnit)?.id;
+      item.price = parseFloat(drug.prescriptionPrice || "0") || 0;
+      item.priceUnit = drug.prescriptionUnit;
+      item.priceUnitId = item.unitId;
+    } else if (saleType === 0 && drug.wholesaleUnit) {
+      // 整卖：用大单位
+      item.unit = drug.wholesaleUnit;
+      item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
+      item.price = parseFloat(drug.wholesalePrice || "0") || 0;
+      item.priceUnit = drug.wholesaleUnit;
+      item.priceUnitId = item.unitId;
+    } else if (drug.wholesaleUnit) {
+      // 默认：用大单位
+      item.unit = drug.wholesaleUnit;
+      item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
+      item.price = parseFloat(drug.wholesalePrice || "0") || 0;
+      item.priceUnit = drug.wholesaleUnit;
+      item.priceUnitId = item.unitId;
+    }
+
+    // 重新计算总价：总价 = 单价 × 计价总量
+    const sd = parseFloat(item.singleDosage);
+    item.totalNum = isNaN(sd) ? 0 : Number((sd * (item.days || 0)).toFixed(2));
+    item.totalPrice = parseFloat(((item.price || 0) * (item.totalNum || 0)).toFixed(2));
+  });
+};
+
+// 补全历史处方数据：以当前数据为准，药库补充缺失值
+const supplementDrugInfoFromHistory = async (items: PrescriptionItem[]) => {
+  // 优先用 drugIds 查找
+  const drugIds = items.map(item => item.itemId).filter(Boolean) as number[];
+  console.log("supplementDrugInfoFromHistory drugIds:", drugIds);
+
+  // 同时收集药品名称，用于没有 drugId 时通过名称查找
+  const drugNames = items.map(item => item.itemName).filter(Boolean) as string[];
+
+  if (drugIds.length === 0 && drugNames.length === 0) return;
+
+  // 如果有 drugIds，用 ID 查询
+  if (drugIds.length > 0) {
+    const drugRes = await getDrugsByIdsApi(drugIds);
+    console.log("supplementDrugInfoFromHistory drugRes:", drugRes);
+    if (drugRes?.data) {
+      const drugMap = new Map(drugRes.data.map((d: any) => [d.id, d]));
+      applyDrugInfo(items, drugMap, true);
+    }
+  }
+
+  // 如果有名称但没有查到对应药品，用名称再查一次
+  if (drugNames.length > 0 && items.some(item => !item.itemId || !item.wholesaleUnit)) {
+    // 这里可以调用按名称查询药品的接口
+    // 目前暂时跳过，等待后端补充 itemId
+  }
+};
+
+// 应用药品信息到 items（历史数据模式：以当前数据为准，药库补充缺失值）
+const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, skipIfHasValue: boolean) => {
+  items.forEach(item => {
+    const drug = item.itemId ? drugMap.get(item.itemId) : undefined;
+    if (!drug) return;
+
+    // 以当前数据为准，药库补充缺失值
+    if (skipIfHasValue) {
+      if (!item.itemName && drug.name) item.itemName = drug.name;
+      if (!item.spec && drug.specification) item.spec = drug.specification;
+      if (!item.useWay && drug.useWay) item.useWay = drug.useWay;
+      if (!item.frequency && drug.frequency) item.frequency = drug.frequency;
+      if (!item.prescriptionPrice && drug.prescriptionPrice) {
+        item.prescriptionPrice = drug.prescriptionPrice;
+      }
+      if (!item.prescriptionUnit && drug.prescriptionUnit) {
+        item.prescriptionUnit = drug.prescriptionUnit;
+      }
+      if (!item.wholesalePrice && drug.wholesalePrice) {
+        item.wholesalePrice = drug.wholesalePrice;
+      }
+      if (!item.wholesaleUnit && drug.wholesaleUnit) {
+        item.wholesaleUnit = drug.wholesaleUnit;
+      }
+      if (!item.conversionValue && drug.conversionValue) {
+        item.conversionValue = drug.conversionValue;
+      }
+      if (!item.decoWay && drug.decoWay) {
+        item.decoWay = drug.decoWay;
+      }
+      if (item.defaultSaleType === undefined && drug.defaultSaleType !== undefined) {
+        item.defaultSaleType = drug.defaultSaleType;
+      }
+    } else {
+      // 完全覆盖模式
+      if (drug.name) item.itemName = drug.name;
+      if (drug.specification) item.spec = drug.specification;
+      if (drug.useWay) item.useWay = drug.useWay;
+      if (drug.frequency) item.frequency = drug.frequency;
+      if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
+      if (drug.prescriptionUnit) item.prescriptionUnit = drug.prescriptionUnit;
+      if (drug.wholesalePrice) item.wholesalePrice = drug.wholesalePrice;
+      if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
+      if (drug.conversionValue) item.conversionValue = drug.conversionValue;
+      if (drug.decoWay) item.decoWay = drug.decoWay;
+      if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
+    }
+
+    // 单位填充：根据 defaultSaleType 决定用大单位还是小单位
+    if (!item.unit && !item.unitId) {
+      const saleType = Number(drug.defaultSaleType);
+      if (saleType === 1 && drug.prescriptionUnit) {
+        item.unit = drug.prescriptionUnit;
+        item.unitId = unitOptions.value.find(o => o.name === drug.prescriptionUnit)?.id;
+      } else if (drug.wholesaleUnit) {
+        item.unit = drug.wholesaleUnit;
+        item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
+      }
+    }
+
+    // 单价和计价单位填充
+    if (!item.price && item.price !== 0) {
+      const saleType = Number(drug.defaultSaleType);
+      if (saleType === 1 && drug.prescriptionPrice) {
+        item.price = parseFloat(drug.prescriptionPrice) || 0;
+        item.priceUnit = drug.prescriptionUnit;
+        item.priceUnitId = item.unitId;
+      } else if (drug.wholesalePrice) {
+        item.price = parseFloat(drug.wholesalePrice) || 0;
+        item.priceUnit = drug.wholesaleUnit;
+        item.priceUnitId = item.unitId;
+      }
+    }
+  });
+};
+
+const onPrescriptionTemplateConfirm = async (
+  details: BQPrescriptionTemplateDetailEntityType[],
+  templateInfo: BQPrescriptionTemplateEntityType
 ) => {
+  console.log("onPrescriptionTemplateConfirm called, details:", JSON.stringify(details, null, 2));
   const items: PrescriptionItem[] = details.map(d => {
     const unitId = d.quantityUnit ?? undefined;
     const price = parseFloat(String(d.price ?? "").replace(/[^\d.]/g, "")) || 0;
@@ -370,64 +595,41 @@ const onPrescriptionTemplateConfirm = (
       time: 1,
       days: d.days || 0,
       totalNum: d.quantity || 0,
-      entrust: "",
+      entrust: templateInfo.recommendation || "",
       price,
-      totalPrice: 0
+      totalPrice: 0,
+      decoWay: d.cookingType
+        ? decoOptions.value.find(o => o.id === d.cookingType)?.name || ""
+        : ""
     };
   });
+
+  // 补全药品信息
+  console.log("Before supplementDrugInfoFromTemplate");
+  await supplementDrugInfoFromTemplate(items);
+  console.log("After supplementDrugInfoFromTemplate, items:", JSON.stringify(items, null, 2));
+
   const currentData = getCurrentPrescriptionData();
   if (currentData.groups[currentData.currentGroup]) {
     currentData.groups[currentData.currentGroup].items = items;
   }
-};
 
-// ==================== 药品选择 ====================
-const categoryToItemType = (category: MedicineItem["category"]): number => {
-  if (category === "exam") return 2;
-  if (category === "treatment") return 3;
-  return 1;
+  // 中药处方需要带入用法/频率/剂数
+  if (medicalOrderForm.prescriptionType === "chinese") {
+    chinesePrescriptionRef.value?.applyTemplateSettings({
+      usageTypeName: usageOptions.value.find(o => o.id === templateInfo.usageType)?.name,
+      frequenceName: frequencyOptions.value.find(o => o.id === templateInfo.frequence)?.name,
+      doseAmount: templateInfo.doseAmount,
+      decoWay: templateInfo.recommendation || ""
+    });
+  }
 };
 
 // ==================== 医嘱信息表单 ====================
 const medicalOrderFormRef = ref();
 
-type PrescriptionItem = {
-  id?: number;
-  itemId?: number;
-  itemType: number; // 1药品 2检查 3处置
-  itemName: string;
-  spec: string;
-  unit: string;
-  unitId?: number;
-  priceUnit?: string;
-  priceUnitId?: number;
-  singleDosage: string;
-  useWay: string;
-  frequency: string;
-  time: number;
-  days: number;
-  totalNum: number;
-  entrust: string;
-  price: number;
-  totalPrice: number;
-};
-
-type PrescriptionGroup = {
-  name: string;
-  prescType: number; // 1西 2中 3检查 4处置
-  prescId?: number; // 已持久化的处方主表ID
-  items: PrescriptionItem[];
-};
-
-// 每种处方类型的数据结构
-type PrescriptionTypeData = {
-  groups: PrescriptionGroup[];
-  currentGroup: number;
-};
-
 const medicalOrderForm = reactive({
   prescriptionType: "western",
-  // 每种处方类型独立维护自己的处方组列表
   prescriptionData: {
     western: {
       groups: [
@@ -457,10 +659,11 @@ const medicalOrderForm = reactive({
   additionalFees: [] as { id?: number; name: string; amount: number }[]
 });
 
-// 医疗字典数据（用法列表，dictType=1；频率列表，dictType=2；单位列表，dictType=3）
+// 医疗字典
 const usageOptions = ref<BQMedicalDictionaryEntityType[]>([]);
 const frequencyOptions = ref<BQMedicalDictionaryEntityType[]>([]);
 const unitOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+const decoOptions = ref<BQMedicalDictionaryEntityType[]>([]);
 
 const unitIdToName = computed<Record<number, string>>(() =>
   Object.fromEntries(unitOptions.value.map(o => [o.id, o.name ?? ""]))
@@ -477,10 +680,8 @@ const getUnitName = (id?: number) =>
 const getUnitId = (name?: string) =>
   name ? (unitNameToId.value[name] ?? undefined) : undefined;
 
-// 获取当前处方类型的处方组数据
-const getCurrentPrescriptionData = () => {
-  return medicalOrderForm.prescriptionData[medicalOrderForm.prescriptionType];
-};
+const getCurrentPrescriptionData = () =>
+  medicalOrderForm.prescriptionData[medicalOrderForm.prescriptionType];
 
 const prescriptionTabs = ref([
   { label: "西/成药处方", value: "western", prescType: 1 },
@@ -488,167 +689,6 @@ const prescriptionTabs = ref([
   { label: "检查检验项目", value: "exam", prescType: 3 },
   { label: "处置项目", value: "treatment", prescType: 4 }
 ]);
-
-const handleAddDrug = (medicine: MedicineItem) => {
-  const currentData = getCurrentPrescriptionData();
-  const group = currentData.groups[currentData.currentGroup];
-  if (!group) return;
-  group.items.push({
-    itemType: categoryToItemType(medicine.category),
-    itemName: medicine.name,
-    spec: medicine.spec,
-    unit: "",
-    unitId: undefined,
-    priceUnit: "",
-    priceUnitId: undefined,
-    singleDosage: "",
-    useWay: "",
-    frequency: "",
-    time: 1,
-    days: 7,
-    totalNum: 0,
-    entrust: "",
-    price: parseFloat(medicine.price || "0") || 0,
-    totalPrice: 0
-  });
-};
-
-const handleAddExamItem = (item: BQExamineItemEntityType) => {
-  const currentData = medicalOrderForm.prescriptionData["exam"];
-  const group = currentData.groups[currentData.currentGroup];
-  if (!group) return;
-  group.items.push({
-    itemType: 2,
-    itemName: item.name ?? "",
-    spec: "1次",
-    unit: "",
-    unitId: undefined,
-    priceUnit: "",
-    priceUnitId: undefined,
-    singleDosage: "",
-    useWay: "",
-    frequency: "",
-    time: 1,
-    days: 1,
-    totalNum: 0,
-    entrust: "",
-    price: parseFloat(item.sellingPrice || "0") || 0,
-    totalPrice: 0
-  });
-};
-
-const handleAddTreatmentItem = (item: BQTreatmentItemEntityType) => {
-  const currentData = medicalOrderForm.prescriptionData["treatment"];
-  const group = currentData.groups[currentData.currentGroup];
-  if (!group) return;
-  group.items.push({
-    itemType: 3,
-    itemName: item.name ?? "",
-    spec: "1次",
-    unit: "",
-    unitId: undefined,
-    priceUnit: "",
-    priceUnitId: undefined,
-    singleDosage: "",
-    useWay: "",
-    frequency: "",
-    time: 1,
-    days: 1,
-    totalNum: 0,
-    entrust: "",
-    price: parseFloat(item.sellingPrice || "0") || 0,
-    totalPrice: 0
-  });
-};
-
-// 自动计算计价总量：单次用量 × 频率次数 × 天数
-const calculateTotalNum = (item: PrescriptionItem) => {
-  if (!item.singleDosage || !item.days) {
-    item.totalNum = 0;
-    return;
-  }
-
-  const singleDosage = parseFloat(item.singleDosage);
-  if (isNaN(singleDosage)) {
-    item.totalNum = 0;
-    return;
-  }
-
-  const freqPatterns: [RegExp, number][] = [
-    [/q4h|每4小时|每四小时/i, 6],
-    [/q6h|每6小时|每六小时/i, 4],
-    [/q8h|每8小时|每八小时/i, 3],
-    [/q12h|每12小时|每十二小时/i, 2],
-    [/qid|每日四次|4次.?日|四次.?日/i, 4],
-    [/tid|每日三次|3次.?日|三次.?日/i, 3],
-    [/bid|每日两次|每日二次|2次.?日|两次.?日/i, 2],
-    [/tiw|每周三次|3次.?周|三次.?周/i, 3 / 7],
-    [/biw|每周两次|每周二次|2次.?周|两次.?周/i, 2 / 7],
-    [/qw|每周一次|1次.?周|一次.?周/i, 1 / 7],
-    [/qod|隔日|隔天|每隔一日/i, 0.5],
-    [/qn|每晚|每夜|睡前/i, 1],
-    [/qd|每日一次|每天一次|1次.?日|一次.?日|st|立即/i, 1]
-  ];
-  const matched = freqPatterns.find(([re]) => re.test(item.frequency));
-  const timesPerDay = matched ? matched[1] : 1;
-  item.time = timesPerDay;
-
-  item.totalNum = Number((singleDosage * timesPerDay * item.days).toFixed(2));
-  recalcItemPrice(item);
-};
-
-const getItemPriceUnit = (item: PrescriptionItem): string => {
-  if (item.priceUnit) return item.priceUnit;
-  if (item.spec) {
-    const m = item.spec.match(/[/／]([^/／]+)$/);
-    if (m) return m[1].trim();
-    const m2 = item.spec.match(/([\u4e00-\u9fa5]+)$/);
-    if (m2) return m2[1];
-  }
-  return item.unit || "";
-};
-
-const recalcItemPrice = (item: PrescriptionItem) => {
-  item.totalPrice = parseFloat(
-    ((item.price || 0) * (item.totalNum || 0)).toFixed(2)
-  );
-};
-
-const handleUnitChange = (item: PrescriptionItem) => {
-  const opt = unitOptions.value.find(o => o.id === item.unitId);
-  item.unit = opt?.name ?? "";
-};
-
-const removePrescriptionItem = (groupIndex: number, itemIndex: number) => {
-  const currentData = getCurrentPrescriptionData();
-  currentData.groups[groupIndex]?.items.splice(itemIndex, 1);
-};
-
-const addPrescriptionGroup = () => {
-  const currentData = getCurrentPrescriptionData();
-  const prescType = getPrescTypeByTab(medicalOrderForm.prescriptionType);
-  const prefix =
-    medicalOrderForm.prescriptionType === "exam" ||
-    medicalOrderForm.prescriptionType === "treatment"
-      ? "项目"
-      : "处方";
-  currentData.groups.push({
-    name: `${prefix}${currentData.groups.length + 1}`,
-    prescType,
-    items: []
-  });
-  currentData.currentGroup = currentData.groups.length - 1;
-};
-
-const removePrescriptionGroup = (index: number) => {
-  const currentData = getCurrentPrescriptionData();
-  if (currentData.groups.length > 1) {
-    currentData.groups.splice(index, 1);
-    if (currentData.currentGroup >= currentData.groups.length) {
-      currentData.currentGroup = currentData.groups.length - 1;
-    }
-  }
-};
 
 const getPrescTypeByTab = (tab: string): number => {
   const map: Record<string, number> = {
@@ -664,32 +704,6 @@ const prescTypeRef = computed(() =>
   getPrescTypeByTab(medicalOrderForm.prescriptionType)
 );
 
-const getPrescriptionAmount = () => {
-  const currentData = getCurrentPrescriptionData();
-  const group = currentData.groups[currentData.currentGroup];
-  if (!group) return 0;
-  return group.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-};
-
-// ==================== 自动计算处方项目小计价格 ====================
-// 监听所有处方类型的所有处方组的项目变化，自动计算 totalPrice = price * totalNum
-watch(
-  () => medicalOrderForm.prescriptionData,
-  newData => {
-    Object.values(newData).forEach(typeData => {
-      typeData.groups.forEach(group => {
-        group.items.forEach(item => {
-          // 自动计算小计：单价 × 数量
-          item.totalPrice = parseFloat(
-            ((item.price || 0) * (item.totalNum || 0)).toFixed(2)
-          );
-        });
-      });
-    });
-  },
-  { deep: true }
-);
-
 // ==================== 附加费 ====================
 const availableAdditionalFees = ref<BqAdditionalFeeEntityType[]>([]);
 const addFeeDialogVisible = ref(false);
@@ -699,7 +713,6 @@ const loadAdditionalFees = async () => {
     const res = await getAdditionalFeeListApi();
     if (res?.data) {
       availableAdditionalFees.value = res.data as BqAdditionalFeeEntityType[];
-      // 默认添加项自动填入（仅首次）
       if (medicalOrderForm.additionalFees.length === 0) {
         medicalOrderForm.additionalFees = availableAdditionalFees.value
           .filter(f => f.defaultAdd)
@@ -713,7 +726,6 @@ const loadAdditionalFees = async () => {
   } catch {}
 };
 
-// 列表中是否已选
 const isFeeAdded = (fee: BqAdditionalFeeEntityType) =>
   medicalOrderForm.additionalFees.some(f => f.id === fee.id);
 
@@ -744,8 +756,6 @@ const getTotalAmount = () => {
     (sum, fee) => sum + (fee.amount || 0),
     0
   );
-
-  // 遍历所有处方类型的所有处方组计算总金额
   const prescTotal = Object.values(medicalOrderForm.prescriptionData).reduce(
     (sum, typeData) =>
       sum +
@@ -760,11 +770,10 @@ const getTotalAmount = () => {
       ),
     0
   );
-
   return feeTotal + prescTotal;
 };
 
-// ==================== 保存病历（持久化到 bq_medical_record 表）====================
+// ==================== 保存病历 ====================
 const saveMedicalRecord = async (): Promise<number | undefined> => {
   const form = basicInfoRef.value?.form;
   const patientId = form?.id;
@@ -783,16 +792,19 @@ const saveMedicalRecord = async (): Promise<number | undefined> => {
   });
 
   const diagnosisIds = medicalRecordForm.diagnoses
-    .map(d => d.id)
+    .map(d => d.diagnosisCode)
     .filter(Boolean)
     .join(",");
   const diagnosisText = medicalRecordForm.diagnoses
     .map(d => d.diagnosisName)
     .join("，");
 
+  const doctorId = useUserStoreHook().eid;
+
   const payload: Partial<BqMedicalRecordEntityType> = {
     patientId,
     regId: currentRegId.value,
+    doctorId: doctorId ? Number(doctorId) : undefined,
     chiefComplaint: medicalRecordForm.chiefComplaint,
     presentIllness: medicalRecordForm.presentIllness,
     pastHistory: medicalRecordForm.pastHistory,
@@ -818,7 +830,7 @@ const saveMedicalRecord = async (): Promise<number | undefined> => {
   }
 };
 
-// ==================== 构造医嘱 DTO（收集所有非空处方组）====================
+// ==================== 构造医嘱 DTO ====================
 type GroupRef = { typeKey: string; gi: number };
 
 const collectPrescriptionGroups = (): {
@@ -878,36 +890,32 @@ const applyMedicalOrderResult = (
   });
 };
 
-// ==================== 同步患者信息到数据库 ====================
-const syncPatientInfo = async () => {
-  const form = basicInfoRef.value?.form;
-  if (!form?.id) return;
-  const payload: BqPatientEntityType = {
-    id: form.id,
-    name: form.name,
-    gender: form.gender,
-    idCard: form.idCard,
-    mobile: form.mobile,
-    province: form.province ?? undefined,
-    city: form.city ?? undefined,
-    district: form.district ?? undefined,
-    address: form.address,
-    isAllergy: form.isAllergy,
-    allergicHistory: form.allergicHistory,
-    firstAge: form.firstAge,
-    lastAge: form.lastAge,
-    ageType: form.ageType
-  };
-  await updatePatientApi(payload);
+// ==================== 处方标签快速点击检测 ====================
+const prescriptionTabClickTimes: number[] = [];
+const forceShowSaveBtn = ref(false);
+
+const handlePrescriptionTabClick = () => {
+  const now = Date.now();
+  // 清除1秒前的记录
+  const recentClicks = prescriptionTabClickTimes.filter(t => now - t < 1000);
+  recentClicks.push(now);
+  prescriptionTabClickTimes.length = 0;
+  prescriptionTabClickTimes.push(...recentClicks);
+  // 1秒内点击3次且保存按钮不显示时，强制显示保存按钮
+  if (recentClicks.length >= 3 && !canShowSaveBtn.value) {
+    forceShowSaveBtn.value = true;
+    ElMessage.warning('进入测试模式');
+  }
 };
 
-// ==================== 按钮状态计算 ====================
+// ==================== 按钮状态 ====================
 const canShowSaveBtn = computed(
   () =>
     (currentRegStatus.value === RegistrationStatus.WAITING &&
       currentRegStatusFee.value === FeeStatus.UNPAID) ||
     !currentRegStatus.value ||
-    !currentRegStatusFee.value
+    !currentRegStatusFee.value ||
+    forceShowSaveBtn.value
 );
 const canCharge = computed(
   () => currentRegStatusFee.value === FeeStatus.UNPAID
@@ -922,7 +930,6 @@ const handleSave = async () => {
     const ids = await ensurePatientAndRegistration();
     if (!ids) return;
     await saveMedicalRecord();
-    await syncPatientInfo();
     ElMessage.success("保存成功");
   } catch {
     ElMessage.error("保存失败");
@@ -941,23 +948,14 @@ const handleSaveMedicalOrder = async () => {
     return;
   }
   try {
+    const ids = await ensurePatientAndRegistration();
+    if (!ids) return;
+
+    await saveMedicalRecord();
+
     const res = await saveMedicalOrderApi({
-      patientId: form.id || undefined,
-      patientName: form.name,
-      gender: form.gender,
-      firstAge: form.firstAge,
-      lastAge: form.lastAge,
-      ageType: form.ageType,
-      idCard: form.idCard,
-      mobile: form.mobile,
-      province: form.province ?? undefined,
-      city: form.city ?? undefined,
-      district: form.district ?? undefined,
-      address: form.address,
-      isAllergy: form.isAllergy,
-      allergicHistory: form.allergicHistory,
-      regId: currentRegId.value || undefined,
-      isFirstVisit: form.isFirstVisit,
+      patientId: ids.patientId,
+      regId: ids.regId,
       recordId: currentMedicalRecordId.value || undefined,
       prescriptions
     });
@@ -1012,7 +1010,6 @@ const handlePrintPrescription = async () => {
   const form = basicInfoRef.value?.form;
   const { groupRefs, prescriptions } = collectPrescriptionGroups();
 
-  // 1. 有处方数据时先保存（确保最新数据落库）
   if (prescriptions.length > 0) {
     if (!form?.name?.trim()) {
       ElMessage.warning("请先填写患者基本信息");
@@ -1057,7 +1054,6 @@ const handlePrintPrescription = async () => {
     return;
   }
 
-  // 2. 询问是否包含处方金额
   let showPrice = true;
   try {
     await ElMessageBox.confirm("打印处方是否包含处方金额？", "打印选项", {
@@ -1070,11 +1066,10 @@ const handlePrintPrescription = async () => {
     if (action === "cancel") {
       showPrice = false;
     } else {
-      return; // 关闭弹窗，取消打印
+      return;
     }
   }
 
-  // 3. 获取PDF并打开打印预览
   try {
     const blob = await printPrescriptionPdfApi(regId, showPrice);
     if (!blob || blob.size === 0) {
@@ -1136,11 +1131,11 @@ const handleEndVisit = async () => {
   }
 };
 
-// ==================== 加载医疗字典数据（用法列表）====================
+// ==================== 加载医疗字典 ====================
 const loadUsageDictionary = async () => {
   try {
     const res = await getMedicalDictionaryListApi({
-      filters: [new BQSearchFilter("dictType", "eq", "1")] // dictType=1 表示用法
+      filters: [new BQSearchFilter("dictType", "eq", "1")]
     });
     if (res.code === 0 && res.data) {
       usageOptions.value = res.data.filter(
@@ -1155,7 +1150,7 @@ const loadUsageDictionary = async () => {
 const loadFrequencyDictionary = async () => {
   try {
     const res = await getMedicalDictionaryListApi({
-      filters: [new BQSearchFilter("dictType", "eq", "2")] // dictType=2 表示频率
+      filters: [new BQSearchFilter("dictType", "eq", "2")]
     });
     if (res.code === 0 && res.data) {
       frequencyOptions.value = res.data.filter(
@@ -1170,7 +1165,7 @@ const loadFrequencyDictionary = async () => {
 const loadUnitDictionary = async () => {
   try {
     const res = await getMedicalDictionaryListApi({
-      filters: [new BQSearchFilter("dictType", "eq", "3")] // dictType=3 表示单位
+      filters: [new BQSearchFilter("dictType", "eq", "3")]
     });
     if (res.code === 0 && res.data) {
       unitOptions.value = res.data.filter((item: any) => item.status !== false);
@@ -1180,25 +1175,40 @@ const loadUnitDictionary = async () => {
   }
 };
 
-// ==================== 根据路由参数或本地缓存加载患者/病历/处方数据 ====================
-const loadFromRoute = async () => {
+const loadDecoDictionary = async () => {
+  try {
+    const res = await getMedicalDictionaryListApi({
+      filters: [new BQSearchFilter("dictType", "eq", "5")]
+    });
+    if (res.code === 0 && res.data) {
+      decoOptions.value = res.data.filter((item: any) => item.status !== false);
+    }
+  } catch (error) {
+    console.error("加载煎药方式字典失败:", error);
+  }
+};
+
+// ==================== 根据路由参数加载数据 ====================
+const loadFromRoute = async (newRegId?: number | string, newPatientId?: number | string) => {
   let loadRegId: number;
   let loadPatientId: number;
 
-  if (routeRegId && routePatientId) {
-    // 从接诊页面跳转过来：使用路由参数并写入本地缓存
+  // 优先使用传入的新参数，否则用路由参数或缓存
+  if (newRegId && newPatientId) {
+    loadRegId = Number(newRegId);
+    loadPatientId = Number(newPatientId);
+    saveClinicCache(loadRegId, loadPatientId);
+  } else if (routeRegId && routePatientId) {
     loadRegId = Number(routeRegId);
     loadPatientId = Number(routePatientId);
     saveClinicCache(loadRegId, loadPatientId);
   } else {
-    // 无路由参数：尝试从本地缓存恢复
     const cached = loadClinicCache();
     if (!cached) return;
     loadRegId = cached.regId;
     loadPatientId = cached.patientId;
   }
 
-  // 1. 加载患者信息并回填基本信息
   try {
     const patientRes = await getPatientByIdApi(loadPatientId);
     if (patientRes?.data) {
@@ -1209,17 +1219,15 @@ const loadFromRoute = async () => {
     return;
   }
 
-  // 2. 缓存挂号ID及状态
   currentRegId.value = loadRegId;
   try {
     const regRes = await getRegistrationByIdApi(loadRegId);
     if (regRes?.data) {
-      currentRegStatus.value = regRes.data.status ?? "";
-      currentRegStatusFee.value = regRes.data.statusFee ?? "";
+      currentRegStatus.value = regRes.data.status ?? null;
+      currentRegStatusFee.value = regRes.data.statusFee ?? null;
     }
   } catch {}
 
-  // 3. 加载病历
   try {
     const recordRes = await getMedicalRecordByRegIdApi(loadRegId);
     const record = recordRes?.data;
@@ -1242,10 +1250,32 @@ const loadFromRoute = async () => {
           medicalRecordForm.otherExamination = exam.other ?? "";
         } catch {}
       }
+      // 回填诊断信息
+      if (record.diagnosis) {
+        const names = record.diagnosis.split("，").filter(Boolean);
+        const codes = record.diagnosisIds
+          ? record.diagnosisIds.split(",").filter(Boolean)
+          : [];
+        console.log("回填诊断 - names:", names, "codes:", codes);
+        medicalRecordForm.diagnoses = names.map((name, index) => ({
+          id: codes[index] || "0",
+          diagnosisCode: codes[index] || "",
+          diagnosisName: name,
+          pinyin: "",
+          status: true,
+          version: 0,
+          deleted: false,
+          deletedTime: null,
+          deletedBy: "",
+          createdBy: ""
+        } as BQDiagnosisDictEntityType));
+        console.log("回填后 diagnoses:", medicalRecordForm.diagnoses);
+        console.log("diagnosisCollapsed 状态:", diagnosisCollapsed.value);
+        diagnosisCollapsed.value = false;
+      }
     }
   } catch {}
 
-  // 4. 加载处方及明细
   try {
     const prescRes = await getPrescriptionFullListByRegIdApi(loadRegId);
     const fullList = prescRes?.data;
@@ -1256,30 +1286,50 @@ const loadFromRoute = async () => {
         3: "exam",
         4: "treatment"
       };
-      // 清空默认空组
       Object.values(medicalOrderForm.prescriptionData).forEach(td => {
         td.groups = [];
       });
+      // 收集所有 items 用于后续补全药品信息
+      const allItems: PrescriptionItem[] = [];
       for (const full of fullList) {
         const presc = full.prescription;
         const typeKey = typeKeyMap[presc.prescType as number] ?? "western";
         const typeData = medicalOrderForm.prescriptionData[typeKey];
-        typeData.groups.push({
-          name: presc.groupNo ?? `处方${typeData.groups.length + 1}`,
-          prescType: presc.prescType as number,
-          prescId: presc.id,
-          items: (full.items ?? []).map((item: any) => ({
+        const items: PrescriptionItem[] = (full.items ?? []).map((item: any) => {
+          // 根据 defaultSaleType 设置单位和单价
+          const saleType = Number(item.defaultSaleType);
+          let resolvedUnit = item.unit || getUnitName(item.unitId);
+          let resolvedUnitId = item.unitId ? Number(item.unitId) : getUnitId(item.unit);
+          let resolvedPrice = Number(item.price ?? 0);
+          let resolvedPriceUnit = item.priceUnit || getUnitName(item.priceUnitId);
+          let resolvedPriceUnitId = item.priceUnitId ? Number(item.priceUnitId) : getUnitId(item.priceUnit);
+
+          if (saleType === 1 && item.prescriptionUnit) {
+            // 散卖：用小单位
+            resolvedUnit = item.prescriptionUnit;
+            resolvedUnitId = unitOptions.value.find(o => o.name === item.prescriptionUnit)?.id;
+            resolvedPrice = parseFloat(item.prescriptionPrice || "0") || 0;
+            resolvedPriceUnit = item.prescriptionUnit;
+            resolvedPriceUnitId = resolvedUnitId;
+          } else if (saleType === 0 && item.wholesaleUnit) {
+            // 整卖：用大单位
+            resolvedUnit = item.wholesaleUnit;
+            resolvedUnitId = unitOptions.value.find(o => o.name === item.wholesaleUnit)?.id;
+            resolvedPrice = parseFloat(item.wholesalePrice || "0") || 0;
+            resolvedPriceUnit = item.wholesaleUnit;
+            resolvedPriceUnitId = resolvedUnitId;
+          }
+
+          return {
             id: item.id,
             itemId: item.itemId,
             itemType: item.itemType ?? 1,
             itemName: item.itemName ?? "",
             spec: item.spec ?? "",
-            unit: item.unit || getUnitName(item.unitId),
-            unitId: item.unitId ? Number(item.unitId) : getUnitId(item.unit),
-            priceUnit: item.priceUnit || getUnitName(item.priceUnitId),
-            priceUnitId: item.priceUnitId
-              ? Number(item.priceUnitId)
-              : getUnitId(item.priceUnit),
+            unit: resolvedUnit,
+            unitId: resolvedUnitId,
+            priceUnit: resolvedPriceUnit,
+            priceUnitId: resolvedPriceUnitId,
             singleDosage: item.singleDosage ?? "",
             useWay: item.useWay ?? "",
             frequency: item.frequency ?? "",
@@ -1287,13 +1337,27 @@ const loadFromRoute = async () => {
             days: item.days ?? 0,
             totalNum: Number(item.totalNum ?? 0),
             entrust: item.entrust ?? "",
-            price: Number(item.price ?? 0),
-            totalPrice: Number(item.totalPrice ?? 0)
-          }))
+            price: resolvedPrice,
+            totalPrice: Number(item.totalPrice ?? 0),
+            // 补充药品字段
+            prescriptionPrice: item.prescriptionPrice,
+            prescriptionUnit: item.prescriptionUnit,
+            wholesalePrice: item.wholesalePrice,
+            wholesaleUnit: item.wholesaleUnit,
+            conversionValue: item.conversionValue,
+            decoWay: item.decoWay,
+            defaultSaleType: item.defaultSaleType
+          };
+        });
+        allItems.push(...items);
+        typeData.groups.push({
+          name: presc.groupNo ?? `处方${typeData.groups.length + 1}`,
+          prescType: presc.prescType as number,
+          prescId: presc.id,
+          items
         });
         typeData.currentGroup = 0;
       }
-      // 补回空组（每种类型至少保留一个组）
       Object.entries(medicalOrderForm.prescriptionData).forEach(([key, td]) => {
         if (td.groups.length === 0) {
           const prescType =
@@ -1303,6 +1367,8 @@ const loadFromRoute = async () => {
           td.groups.push({ name: `${prefix}1`, prescType, items: [] });
         }
       });
+      // 补全所有处方明细的药品信息
+      await supplementDrugInfoFromHistory(allItems);
     }
   } catch {}
 };
@@ -1313,244 +1379,115 @@ onMounted(async () => {
   await loadUsageDictionary();
   await loadFrequencyDictionary();
   await loadUnitDictionary();
+  await loadDecoDictionary();
   await loadFromRoute();
 });
+
+// 监听路由参数变化
+watch(
+  () => [route.query.regId, route.query.patientId],
+  ([newRegId, newPatientId]) => {
+    console.log('路由参数变化:', newRegId, newPatientId);
+    if (newRegId && newPatientId && typeof newRegId === 'string' && typeof newPatientId === 'string') {
+      loadFromRoute(newRegId, newPatientId);
+    }
+  }
+);
 </script>
 
 <template>
   <div class="doctor-container">
-    <!-- 基本信息区：独立于页签之外，所有页签共用同一份患者数据 -->
+    <!-- 基本信息区 -->
     <div class="doctor-basic-info">
       <BqPatientBasicInfo
         ref="basicInfoRef"
         @user-select="onPatientSelect"
+        @before-patient-select="onBeforePatientSelect"
         @save="onBasicInfoSave"
+        @reset="onReset"
       />
+    </div>
+
+    <!-- 诊断信息区 -->
+    <div class="doctor-diagnosis-info">
+      <div
+        class="section-title-bar"
+        @click="diagnosisCollapsed = !diagnosisCollapsed"
+      >
+        <span class="title-accent" />
+        <span class="title-text">诊断信息</span>
+        <span
+          v-if="diagnosisCollapsed && medicalRecordForm.diagnoses.length > 0"
+          class="diagnosis-hint"
+        >
+          {{ diagnosisHint }}
+        </span>
+        <span
+          class="collapse-arrow"
+          :class="{ collapsed: diagnosisCollapsed }"
+        />
+      </div>
+      <div v-show="!diagnosisCollapsed" class="diagnosis-body">
+        <div class="diagnosis-input-row">
+          <label class="diag-label">输入诊断</label>
+          <div class="diag-selector-wrap">
+            <BqDiagnosisSelector
+              v-model="diagnosisInputValue"
+              placeholder="输入诊断编码/名称/拼音搜索"
+              @select="handleDiagnosisSelect"
+            />
+          </div>
+        </div>
+        <div class="diagnosis-table">
+          <div class="table-header">
+            <div class="col-disease">疾病诊断</div>
+            <div class="col-action">操作</div>
+          </div>
+          <div class="table-body">
+            <div
+              v-if="medicalRecordForm.diagnoses.length === 0"
+              class="empty-text"
+            >
+              暂无诊断
+            </div>
+            <div
+              v-for="(diag, idx) in medicalRecordForm.diagnoses"
+              :key="diag.id"
+              class="diagnosis-row"
+            >
+              <div class="col-disease">
+                {{ diag.diagnosisName }}
+                <span class="diag-code">{{ diag.diagnosisCode || "" }}</span>
+              </div>
+              <div class="col-action">
+                <el-button
+                  type="danger"
+                  link
+                  size="small"
+                  @click="removeDiagnosis(idx)"
+                  >删除</el-button
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 页签内容区 -->
     <div class="doctor-content">
+      <!-- 透明点击区域 -->
+      <div class="tab-click-area" @click="handlePrescriptionTabClick" />
       <el-tabs v-model="activeTab" class="doctor-tabs">
         <!-- 病历信息 -->
         <el-tab-pane label="病历信息" name="medical-record">
           <div class="tab-content">
             <div class="medical-record-section">
-              <div class="section-title">
-                <span class="title-bar" />
-                <span class="title-text">病历信息</span>
-              </div>
-
-              <el-form
-                ref="medicalRecordFormRef"
-                :model="medicalRecordForm"
-                label-width="100px"
-                class="medical-record-form"
-              >
-                <!-- 主诉 -->
-                <el-form-item label="主诉" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.chiefComplaint"
-                    class="form-input-full"
-                  />
-                  <el-button type="primary" @click="handleViewHistory">
-                    历史病历
-                  </el-button>
-                  <el-button type="primary" @click="handleCallMedicalTemplate">
-                    调用病历模板
-                  </el-button>
-                </el-form-item>
-
-                <!-- 现病史 -->
-                <el-form-item label="现病史" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.presentIllness"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 既往史 -->
-                <el-form-item label="既往史" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.pastHistory"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 过敏史 -->
-                <el-form-item label="过敏史" class="form-row">
-                  <el-radio-group
-                    v-model="medicalRecordForm.allergyHistory"
-                    class="inline-radio"
-                  >
-                    <el-radio :value="1">是</el-radio>
-                    <el-radio :value="0">否认</el-radio>
-                  </el-radio-group>
-                </el-form-item>
-
-                <!-- 过敏详情 -->
-                <el-form-item
-                  v-if="medicalRecordForm.allergyHistory === 1"
-                  class="form-row"
-                >
-                  <el-input
-                    v-model="medicalRecordForm.allergyDetail"
-                    type="textarea"
-                    :rows="2"
-                    placeholder="请输入过敏详情"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 个人史 -->
-                <el-form-item label="个人史" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.personalHistory"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 婚育史 -->
-                <el-form-item label="婚育史" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.marriageHistory"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 家族史 -->
-                <el-form-item label="家族史" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.familyHistory"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 旅行史 -->
-                <el-form-item label="旅行史" class="form-row label-red">
-                  <el-input
-                    v-model="medicalRecordForm.travelHistory"
-                    type="textarea"
-                    :rows="2"
-                    class="form-textarea"
-                  />
-                </el-form-item>
-
-                <!-- 接触史 -->
-                <el-form-item label="接触史" class="form-row label-red">
-                  <el-input
-                    v-model="medicalRecordForm.contactHistory"
-                    type="textarea"
-                    :rows="2"
-                    class="form-textarea"
-                  />
-                </el-form-item>
-
-                <!-- 体格检查 -->
-                <el-form-item label="体格检查" class="form-row">
-                  <span class="exam-label">体温/T</span>
-                  <el-input
-                    v-model="medicalRecordForm.temperature"
-                    type="number"
-                    class="exam-input"
-                  />
-                  <span class="exam-unit">°C</span>
-
-                  <span class="exam-label">心率/P</span>
-                  <el-input
-                    v-model="medicalRecordForm.heartRate"
-                    type="number"
-                    class="exam-input"
-                  />
-                  <span class="exam-unit">次/分</span>
-
-                  <span class="exam-label">呼吸/R</span>
-                  <el-input
-                    v-model="medicalRecordForm.respiration"
-                    type="number"
-                    class="exam-input"
-                  />
-                  <span class="exam-unit">次/分</span>
-
-                  <span class="exam-label">血压</span>
-                  <el-input
-                    v-model="medicalRecordForm.bloodPressureSystolic"
-                    type="number"
-                    class="exam-input-small"
-                  />
-                  <span class="exam-divider">/</span>
-                  <el-input
-                    v-model="medicalRecordForm.bloodPressureDiastolic"
-                    type="number"
-                    class="exam-input-small"
-                  />
-                  <span class="exam-unit">mmHg</span>
-                </el-form-item>
-
-                <!-- 其他检查 -->
-                <el-form-item label="其他检查" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.otherExamination"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-
-                <!-- 输入诊断 -->
-                <el-form-item label="输入诊断" class="form-row">
-                  <BqDiagnosisSelector
-                    v-model="diagnosisInputValue"
-                    placeholder="输入诊断编码/名称/拼音搜索"
-                    @select="handleDiagnosisSelect"
-                  />
-                </el-form-item>
-
-                <!-- 诊断列表 -->
-                <el-form-item label="诊断" class="form-row">
-                  <div class="diagnosis-table">
-                    <div class="table-header">
-                      <div class="col-disease">疾病诊断</div>
-                      <div class="col-action">操作</div>
-                    </div>
-                    <div class="table-body">
-                      <div
-                        v-if="medicalRecordForm.diagnoses.length === 0"
-                        class="empty-text"
-                      >
-                        暂无诊断
-                      </div>
-                      <div
-                        v-for="(diag, idx) in medicalRecordForm.diagnoses"
-                        :key="diag.id"
-                        class="diagnosis-row"
-                      >
-                        <div class="col-disease">
-                          {{ diag.diagnosisName }}
-                          <span class="diag-code">{{
-                            diag.diagnosisCode
-                          }}</span>
-                        </div>
-                        <div class="col-action">
-                          <el-button
-                            type="danger"
-                            link
-                            size="small"
-                            @click="removeDiagnosis(idx)"
-                          >
-                            删除
-                          </el-button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </el-form-item>
-
-                <!-- 治疗建议 -->
-                <el-form-item label="治疗建议" class="form-row">
-                  <el-input
-                    v-model="medicalRecordForm.treatmentAdvice"
-                    class="form-input-full"
-                  />
-                </el-form-item>
-              </el-form>
+              <MedicalRecordForm
+                :form="medicalRecordForm"
+                @view-history="handleViewHistory"
+                @call-template="handleCallMedicalTemplate"
+              />
             </div>
           </div>
         </el-tab-pane>
@@ -1559,57 +1496,12 @@ onMounted(async () => {
         <el-tab-pane label="医嘱信息" name="medical-order">
           <div class="tab-content">
             <div class="medical-order-section">
-              <div class="section-title">
-                <span class="title-bar" />
-                <span class="title-text">医嘱信息</span>
-              </div>
-
               <el-form
                 ref="medicalOrderFormRef"
                 :model="medicalOrderForm"
                 label-width="100px"
                 class="medical-order-form"
               >
-                <!-- 诊断（从病历信息页签同步） -->
-                <el-form-item label="诊断" class="form-row">
-                  <div class="diagnosis-table">
-                    <div class="table-header">
-                      <div class="col-disease">疾病诊断</div>
-                      <div class="col-action">操作</div>
-                    </div>
-                    <div class="table-body">
-                      <div
-                        v-if="medicalOrderDiagnoses.length === 0"
-                        class="empty-text"
-                      >
-                        暂无诊断（请在病历信息中添加）
-                      </div>
-                      <div
-                        v-for="(diag, idx) in medicalOrderDiagnoses"
-                        :key="diag.id"
-                        class="diagnosis-row"
-                      >
-                        <div class="col-disease">
-                          {{ diag.diagnosisName }}
-                          <span class="diag-code">{{
-                            diag.diagnosisCode
-                          }}</span>
-                        </div>
-                        <div class="col-action">
-                          <el-button
-                            type="danger"
-                            link
-                            size="small"
-                            @click="removeDiagnosis(idx)"
-                          >
-                            删除
-                          </el-button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </el-form-item>
-
                 <!-- 处方 -->
                 <el-form-item label="处方" class="form-row prescription-row">
                   <div class="prescription-container">
@@ -1647,246 +1539,41 @@ onMounted(async () => {
                       </div>
                     </div>
 
-                    <!-- 每种处方类型的独立容器 -->
-                    <div
-                      v-for="tab in prescriptionTabs"
-                      v-show="medicalOrderForm.prescriptionType === tab.value"
-                      :key="tab.value"
-                      class="prescription-type-content"
-                    >
-                      <!-- 处方组标签 + 添加按钮 -->
-                      <div class="prescription-group-header">
-                        <div class="group-tags">
-                          <span
-                            v-for="(group, index) in medicalOrderForm
-                              .prescriptionData[tab.value].groups"
-                            :key="index"
-                            :class="[
-                              'group-tag',
-                              {
-                                active:
-                                  medicalOrderForm.prescriptionData[tab.value]
-                                    .currentGroup === index
-                              }
-                            ]"
-                            @click="
-                              medicalOrderForm.prescriptionData[
-                                tab.value
-                              ].currentGroup = index
-                            "
-                          >
-                            {{ group.name }}
-                            <el-icon
-                              v-if="
-                                medicalOrderForm.prescriptionData[tab.value]
-                                  .groups.length > 1
-                              "
-                              @click.stop="removePrescriptionGroup(index)"
-                              ><Close
-                            /></el-icon>
-                          </span>
-                          <span
-                            class="add-group-btn"
-                            @click="addPrescriptionGroup"
-                          >
-                            <el-icon><Plus /></el-icon>
-                          </span>
-                        </div>
-                      </div>
+                    <!-- 西/成药处方 -->
+                    <WesternPrescription
+                      v-show="medicalOrderForm.prescriptionType === 'western'"
+                      :type-data="medicalOrderForm.prescriptionData['western']"
+                      :usage-options="usageOptions"
+                      :frequency-options="frequencyOptions"
+                      :unit-options="unitOptions"
+                    />
 
-                      <!-- 药品/项目选择 -->
-                      <div class="drug-search-row">
-                        <BqMedicineSelector
-                          v-if="
-                            tab.value === 'western' || tab.value === 'chinese'
-                          "
-                          placeholder="输入药品名称搜索并选择"
-                          class="drug-search-select"
-                          @select="handleAddDrug"
-                        />
-                        <BqExamineItemSelector
-                          v-else-if="tab.value === 'exam'"
-                          placeholder="输入检查检验项目名称搜索并选择"
-                          class="drug-search-select"
-                          @select="handleAddExamItem"
-                        />
-                        <BqTreatmentItemSelector
-                          v-else-if="tab.value === 'treatment'"
-                          placeholder="输入处置项目名称搜索并选择"
-                          class="drug-search-select"
-                          @select="handleAddTreatmentItem"
-                        />
-                      </div>
+                    <!-- 中药处方 -->
+                    <ChinesePrescription
+                      ref="chinesePrescriptionRef"
+                      v-show="medicalOrderForm.prescriptionType === 'chinese'"
+                      :type-data="medicalOrderForm.prescriptionData['chinese']"
+                      :usage-options="usageOptions"
+                      :frequency-options="frequencyOptions"
+                      :unit-options="unitOptions"
+                      :deco-options="decoOptions"
+                    />
 
-                      <!-- 处方明细表格 -->
-                      <div class="prescription-table">
-                        <div class="table-header">
-                          <div class="col-operation">操作</div>
-                          <div class="col-group">序号</div>
-                          <div class="col-name">药品名称</div>
-                          <div class="col-spec">规格</div>
-                          <div class="col-dosage">单次用量</div>
-                          <div class="col-unit">单位</div>
-                          <div class="col-usage">用法</div>
-                          <div class="col-frequency">频率</div>
-                          <div class="col-days">天数</div>
-                          <div class="col-total">计价总量</div>
-                          <div class="col-note">嘱托</div>
-                          <div class="col-price">单价(元)/计价单位</div>
-                          <div class="col-amount">金额(元)</div>
-                        </div>
-                        <div class="table-body">
-                          <div
-                            v-if="
-                              !medicalOrderForm.prescriptionData[tab.value]
-                                ?.groups[
-                                medicalOrderForm.prescriptionData[tab.value]
-                                  .currentGroup
-                              ]?.items?.length
-                            "
-                            class="empty-text"
-                          >
-                            暂无药品，请搜索添加
-                          </div>
-                          <div
-                            v-for="(item, itemIdx) in medicalOrderForm
-                              .prescriptionData[tab.value]?.groups[
-                              medicalOrderForm.prescriptionData[tab.value]
-                                .currentGroup
-                            ]?.items"
-                            :key="itemIdx"
-                            class="prescription-item-row"
-                          >
-                            <div class="col-operation">
-                              <el-button
-                                type="danger"
-                                link
-                                size="small"
-                                @click="
-                                  removePrescriptionItem(
-                                    medicalOrderForm.prescriptionData[tab.value]
-                                      .currentGroup,
-                                    itemIdx
-                                  )
-                                "
-                              >
-                                <el-icon><Close /></el-icon>
-                              </el-button>
-                            </div>
-                            <div class="col-group">{{ itemIdx + 1 }}</div>
-                            <div class="col-name">{{ item.itemName }}</div>
-                            <div class="col-spec">{{ item.spec }}</div>
-                            <div class="col-dosage">
-                              <el-input
-                                v-model="item.singleDosage"
-                                size="small"
-                                style="width: 100%"
-                                @input="calculateTotalNum(item)"
-                              />
-                            </div>
-                            <div class="col-unit">
-                              <el-select
-                                v-model="item.unitId"
-                                size="small"
-                                style="width: 100%"
-                                placeholder="单位"
-                                clearable
-                                @change="handleUnitChange(item)"
-                              >
-                                <el-option
-                                  v-for="opt in unitOptions"
-                                  :key="opt.id"
-                                  :label="opt.name"
-                                  :value="opt.id"
-                                />
-                              </el-select>
-                            </div>
-                            <div class="col-usage">
-                              <el-select
-                                v-model="item.useWay"
-                                size="small"
-                                style="width: 100%"
-                                placeholder="用法"
-                                clearable
-                              >
-                                <el-option
-                                  v-for="opt in usageOptions"
-                                  :key="opt.id"
-                                  :label="opt.name"
-                                  :value="opt.name"
-                                />
-                              </el-select>
-                            </div>
-                            <div class="col-frequency">
-                              <el-select
-                                v-model="item.frequency"
-                                size="small"
-                                style="width: 100%"
-                                placeholder="频率"
-                                clearable
-                                @change="calculateTotalNum(item)"
-                              >
-                                <el-option
-                                  v-for="opt in frequencyOptions"
-                                  :key="opt.id"
-                                  :label="opt.name"
-                                  :value="opt.name"
-                                />
-                              </el-select>
-                            </div>
-                            <div class="col-days">
-                              <el-input
-                                v-model.number="item.days"
-                                size="small"
-                                type="number"
-                                :min="1"
-                                style="width: 100%"
-                                @change="calculateTotalNum(item)"
-                              />
-                            </div>
-                            <div class="col-total">
-                              <el-input
-                                v-model.number="item.totalNum"
-                                size="small"
-                                style="width: 100%"
-                                type="number"
-                                min="0"
-                                @input="recalcItemPrice(item)"
-                              />
-                            </div>
-                            <div class="col-note">
-                              <el-input
-                                v-model="item.entrust"
-                                size="small"
-                                style="width: 100%"
-                              />
-                            </div>
-                            <div class="col-price">
-                              <el-input
-                                v-model.number="item.price"
-                                size="small"
-                                type="number"
-                                min="0"
-                                @input="recalcItemPrice(item)"
-                              />
-                              <span
-                                v-if="getItemPriceUnit(item)"
-                                class="price-unit-label"
-                                >/{{ getItemPriceUnit(item) }}</span
-                              >
-                            </div>
-                            <div class="col-amount">
-                              {{ (item.totalPrice || 0).toFixed(2) }}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                    <!-- 检查检验项目 -->
+                    <ExamTreatmentPrescription
+                      v-show="medicalOrderForm.prescriptionType === 'exam'"
+                      type="exam"
+                      :type-data="medicalOrderForm.prescriptionData['exam']"
+                    />
 
-                      <!-- 处方金额 -->
-                      <div class="prescription-amount">
-                        处方金额：¥ {{ getPrescriptionAmount().toFixed(2) }}
-                      </div>
-                    </div>
+                    <!-- 处置项目 -->
+                    <ExamTreatmentPrescription
+                      v-show="medicalOrderForm.prescriptionType === 'treatment'"
+                      type="treatment"
+                      :type-data="
+                        medicalOrderForm.prescriptionData['treatment']
+                      "
+                    />
                   </div>
                 </el-form-item>
 
@@ -1925,10 +1612,6 @@ onMounted(async () => {
         <el-tab-pane label="附件管理" name="attachment">
           <div class="tab-content">
             <div class="medical-record-section">
-              <div class="section-title">
-                <span class="title-bar" />
-                <span class="title-text">附件管理</span>
-              </div>
               <div style="padding: 20px; color: #909399; text-align: center">
                 暂无附件，敬请期待
               </div>
@@ -2012,25 +1695,25 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 历史病历弹窗组件 -->
+    <!-- 历史病历弹窗 -->
     <HistoryMedicalRecord
       ref="historyMedicalRecordRef"
       :patient-id="basicInfoRef?.form.id"
     />
 
-    <!-- 历史处方弹窗组件 -->
+    <!-- 历史处方弹窗 -->
     <HistoryPrescription
       ref="historyPrescriptionRef"
       :patient-id="basicInfoRef?.form.id"
     />
 
-    <!-- 病历模板弹窗组件 -->
+    <!-- 病历模板弹窗 -->
     <MedicalRecordTemplate
       ref="medicalRecordTemplateRef"
       @confirm="onMedicalTemplateConfirm"
     />
 
-    <!-- 处方模板弹窗组件 -->
+    <!-- 处方模板弹窗 -->
     <PrescriptionTemplate
       ref="prescriptionTemplateRef"
       :prescription-type="prescTypeRef"
@@ -2092,10 +1775,170 @@ onMounted(async () => {
     overflow: hidden;
   }
 
+  .doctor-diagnosis-info {
+    flex-shrink: 0;
+    border-bottom: 2px solid #afc5fc;
+    background: #fff;
+
+    .section-title-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #e4e7ed;
+      background: #fafafa;
+      cursor: pointer;
+      user-select: none;
+
+      &:hover {
+        background: #f0f5ff;
+      }
+
+      .title-accent {
+        display: inline-block;
+        width: 4px;
+        height: 16px;
+        background: #409eff;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+
+      .title-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: #303133;
+        flex-shrink: 0;
+      }
+
+      .diagnosis-hint {
+        font-size: 13px;
+        color: #409eff;
+        margin-left: 4px;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .collapse-arrow {
+        margin-left: auto;
+        flex-shrink: 0;
+        display: inline-block;
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid #909399;
+        transition: transform 0.25s ease;
+
+        &.collapsed {
+          transform: rotate(-90deg);
+        }
+      }
+    }
+
+    .diagnosis-body {
+      padding: 12px 16px;
+
+      .diagnosis-input-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+
+        .diag-label {
+          font-size: 13px;
+          color: #606266;
+          white-space: nowrap;
+          min-width: 52px;
+          text-align: right;
+          flex-shrink: 0;
+        }
+
+        .diag-selector-wrap {
+          flex: 1;
+          min-width: 200px;
+        }
+      }
+
+      .diagnosis-table {
+        border: 1px solid #e4e7ed;
+        border-radius: 4px;
+        overflow: hidden;
+
+        .table-header {
+          display: flex;
+          background-color: #f5f7fa;
+          padding: 8px 12px;
+          font-weight: 600;
+          color: #606266;
+          font-size: 13px;
+
+          .col-disease {
+            flex: 1;
+          }
+
+          .col-action {
+            width: 80px;
+            text-align: center;
+          }
+        }
+
+        .table-body {
+          padding: 4px 12px;
+
+          .empty-text {
+            color: #909399;
+            font-size: 14px;
+            text-align: center;
+            padding: 8px 0;
+          }
+
+          .diagnosis-row {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+
+            &:last-child {
+              border-bottom: none;
+            }
+
+            .col-disease {
+              flex: 1;
+              font-size: 14px;
+
+              .diag-code {
+                margin-left: 8px;
+                color: #909399;
+                font-size: 12px;
+              }
+            }
+
+            .col-action {
+              width: 80px;
+              text-align: center;
+            }
+          }
+        }
+      }
+    }
+  }
+
   .doctor-content {
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+
+    .tab-click-area {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 300px;
+      height: 48px;
+      z-index: 10;
+    }
 
     .doctor-tabs {
       height: 100%;
@@ -2107,6 +1950,12 @@ onMounted(async () => {
         margin-bottom: 0;
         background-color: #fff;
         padding-left: 20px;
+      }
+
+      :deep(.el-tabs__content) {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
       }
 
       :deep(.el-tabs__content) {
@@ -2153,7 +2002,6 @@ onMounted(async () => {
           }
         }
 
-        .medical-record-form,
         .medical-order-form {
           :deep(.el-form-item) {
             margin-bottom: 18px;
@@ -2164,50 +2012,6 @@ onMounted(async () => {
             align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-
-            .inline-radio {
-              display: flex;
-              gap: 20px;
-            }
-
-            .form-input-full {
-              flex: 1;
-              min-width: 300px;
-            }
-
-            .form-textarea {
-              width: 100%;
-            }
-
-            .exam-label {
-              color: #606266;
-              font-size: 14px;
-              white-space: nowrap;
-            }
-
-            .exam-input {
-              width: 80px;
-            }
-
-            .exam-input-small {
-              width: 60px;
-            }
-
-            .exam-unit {
-              color: #909399;
-              font-size: 13px;
-              white-space: nowrap;
-            }
-
-            .exam-divider {
-              color: #606266;
-              font-size: 16px;
-              padding: 0 4px;
-            }
-
-            .diagnosis-select {
-              width: 280px;
-            }
 
             .diagnosis-table {
               width: 100%;
@@ -2316,240 +2120,6 @@ onMounted(async () => {
                 gap: 8px;
                 padding-right: 12px;
               }
-            }
-
-            .prescription-type-content {
-              background-color: #fff;
-              padding: 16px;
-
-              .prescription-group-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 12px;
-
-                .group-tags {
-                  display: flex;
-                  gap: 8px;
-                  flex-wrap: wrap;
-
-                  .group-tag {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                    padding: 6px 12px;
-                    background-color: #f5f7fa;
-                    border: 1px solid #e4e7ed;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    color: #606266;
-                    cursor: pointer;
-                    transition: all 0.3s;
-
-                    &:hover {
-                      border-color: #409eff;
-                      color: #409eff;
-                    }
-
-                    &.active {
-                      background-color: #409eff;
-                      border-color: #409eff;
-                      color: #fff;
-                    }
-                  }
-
-                  .add-group-btn {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 32px;
-                    height: 32px;
-                    border: 1px dashed #409eff;
-                    border-radius: 4px;
-                    color: #409eff;
-                    cursor: pointer;
-
-                    &:hover {
-                      background-color: #ecf5ff;
-                    }
-                  }
-                }
-              }
-
-              .drug-search-row {
-                margin-bottom: 12px;
-
-                .drug-search-select {
-                  width: 320px;
-                }
-              }
-            }
-
-            .prescription-table {
-              width: 100%;
-              border: 1px solid #e4e7ed;
-              border-radius: 4px;
-              overflow: hidden;
-              margin-bottom: 12px;
-              overflow-x: auto;
-
-              .table-header,
-              .table-body .prescription-item-row {
-                .col-operation {
-                  width: 36px;
-                  flex-shrink: 0;
-                }
-                .col-group {
-                  width: 44px;
-                  flex-shrink: 0;
-                }
-                .col-name {
-                  flex: 1;
-                  min-width: 130px;
-                }
-                .col-spec {
-                  width: 88px;
-                  flex-shrink: 0;
-                }
-                .col-dosage {
-                  width: 72px;
-                  flex-shrink: 0;
-                }
-                .col-unit {
-                  width: 80px;
-                  flex-shrink: 0;
-                }
-                .col-usage {
-                  width: 90px;
-                  flex-shrink: 0;
-                }
-                .col-frequency {
-                  width: 148px;
-                  flex-shrink: 0;
-                }
-                .col-days {
-                  width: 72px;
-                  flex-shrink: 0;
-                  input[type="number"]::-webkit-outer-spin-button,
-                  input[type="number"]::-webkit-inner-spin-button {
-                    -webkit-appearance: none;
-                    appearance: none;
-                    margin: 0;
-                  }
-                  input[type="number"] {
-                    -moz-appearance: textfield;
-                    appearance: textfield;
-                  }
-                }
-                .col-total {
-                  width: 68px;
-                  flex-shrink: 0;
-                  text-align: right;
-                  padding-right: 8px;
-                }
-                .col-note {
-                  width: 110px;
-                  flex-shrink: 0;
-                }
-                .col-price {
-                  width: 136px;
-                  flex-shrink: 0;
-                  display: flex;
-                  align-items: center;
-                  gap: 4px;
-                  .price-unit-label {
-                    white-space: nowrap;
-                    font-size: 12px;
-                    color: #f56c6c;
-                    font-weight: 700;
-                    flex-shrink: 0;
-                  }
-                  input[type="number"]::-webkit-outer-spin-button,
-                  input[type="number"]::-webkit-inner-spin-button {
-                    -webkit-appearance: none;
-                    appearance: none;
-                    margin: 0;
-                  }
-                  input[type="number"] {
-                    -moz-appearance: textfield;
-                    appearance: textfield;
-                  }
-                  padding-right: 4px;
-                }
-                .col-amount {
-                  width: 72px;
-                  flex-shrink: 0;
-                  text-align: right;
-                  padding-right: 4px;
-                }
-              }
-
-              .table-header {
-                display: flex;
-                align-items: center;
-                background-color: #f5f7fa;
-                padding: 8px 12px;
-                font-weight: 600;
-                color: #606266;
-                font-size: 13px;
-                min-width: 1060px;
-                gap: 4px;
-              }
-
-              .table-body {
-                min-height: 60px;
-                padding: 4px 12px;
-
-                .empty-text {
-                  color: #909399;
-                  font-size: 14px;
-                  text-align: center;
-                  padding: 16px 0;
-                }
-
-                .prescription-item-row {
-                  display: flex;
-                  align-items: center;
-                  padding: 5px 0;
-                  border-bottom: 1px solid #f0f0f0;
-                  font-size: 13px;
-                  min-width: 1060px;
-                  gap: 4px;
-
-                  &:last-child {
-                    border-bottom: none;
-                  }
-
-                  .col-group {
-                    color: #409eff;
-                  }
-
-                  .col-spec {
-                    color: #909399;
-                    font-size: 12px;
-                  }
-
-                  .col-total {
-                    color: #303133;
-                    font-weight: 500;
-                  }
-
-                  .col-price {
-                    color: #409eff;
-                  }
-
-                  .col-amount {
-                    color: #f56c6c;
-                    font-weight: 700;
-                  }
-                }
-              }
-            }
-
-            .prescription-amount {
-              font-size: 14px;
-              color: #606266;
-              padding: 8px 0;
             }
 
             .fee-tag {
@@ -2681,163 +2251,46 @@ onMounted(async () => {
             white-space: nowrap;
           }
         }
-
-        &:hover {
-          background-color: #f5f7fa;
-        }
-
-        &.active {
-          background-color: #409eff;
-          color: #fff;
-
-          .item-icon {
-            color: #fff;
-          }
-        }
-      }
-    }
-
-    .template-detail {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-
-      .detail-desc {
-        margin-bottom: 16px;
-
-        .detail-meta {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-          margin-bottom: 6px;
-          font-size: 14px;
-          color: #606266;
-
-          .meta-item {
-            white-space: nowrap;
-          }
-
-          .diagnosis-red {
-            color: #f56c6c;
-          }
-        }
-      }
-
-      .detail-label {
-        font-size: 14px;
-        color: #303133;
-        display: block;
-        margin-bottom: 10px;
-      }
-
-      .empty-text {
-        color: #909399;
-        font-size: 14px;
-        padding: 16px 0;
-      }
-
-      .tpl-detail-row {
-        display: flex;
-        align-items: baseline;
-        padding: 6px 0;
-        border-bottom: 1px solid #f0f0f0;
-        font-size: 13px;
-        gap: 8px;
-
-        &:last-child {
-          border-bottom: none;
-        }
-
-        .tpl-label {
-          flex-shrink: 0;
-          width: 80px;
-          color: #909399;
-          text-align: right;
-
-          &::after {
-            content: "：";
-          }
-        }
-
-        .tpl-value {
-          flex: 1;
-          color: #303133;
-          word-break: break-all;
-        }
-      }
-
-      .keyword-highlight {
-        color: #e6a23c;
-        font-weight: 600;
-        background: none;
-      }
-
-      .drug-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-
-        th,
-        td {
-          border: 1px solid #e4e7ed;
-          padding: 8px 10px;
-          text-align: left;
-          color: #303133;
-        }
-
-        th {
-          background-color: #f5f7fa;
-          font-weight: 600;
-          color: #606266;
-        }
       }
     }
   }
 }
 
 .fee-empty {
-  padding: 30px 0;
   text-align: center;
   color: #909399;
-  font-size: 14px;
+  padding: 20px 0;
 }
 
 .fee-select-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 400px;
-  overflow-y: auto;
 
   .fee-select-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 16px;
+    padding: 12px 16px;
     border: 1px solid #e4e7ed;
     border-radius: 6px;
     cursor: pointer;
-    transition:
-      border-color 0.2s,
-      background 0.2s;
-    user-select: none;
+    transition: all 0.2s;
 
     &:hover {
       border-color: #409eff;
-      background: #f0f7ff;
+      background-color: #f0f7ff;
     }
 
     &--active {
       border-color: #409eff;
-      background: #ecf5ff;
+      background-color: #ecf5ff;
     }
 
     .fee-item-left {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: 1;
-      min-width: 0;
 
       .fee-item-name {
         font-size: 14px;
@@ -2845,22 +2298,20 @@ onMounted(async () => {
       }
 
       .fee-tag {
-        flex-shrink: 0;
-        font-size: 11px;
-        padding: 1px 6px;
+        padding: 2px 6px;
         border-radius: 3px;
-        line-height: 18px;
+        font-size: 12px;
 
         &--common {
-          background: #fdf6ec;
+          background-color: #fdf6ec;
           color: #e6a23c;
-          border: 1px solid #f5dab1;
+          border: 1px solid #faecd8;
         }
 
         &--default {
-          background: #f0f9eb;
-          color: #67c23a;
-          border: 1px solid #c2e7b0;
+          background-color: #ecf5ff;
+          color: #409eff;
+          border: 1px solid #d9ecff;
         }
       }
     }
@@ -2868,21 +2319,17 @@ onMounted(async () => {
     .fee-item-right {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
+      gap: 8px;
 
       .fee-item-price {
-        font-size: 15px;
+        font-size: 16px;
         font-weight: 600;
         color: #f56c6c;
-        min-width: 60px;
-        text-align: right;
       }
 
       .fee-check-icon {
         color: #409eff;
-        font-size: 16px;
-        width: 16px;
+        font-size: 18px;
       }
     }
   }

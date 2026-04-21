@@ -32,3 +32,9 @@ export const isDev = () => {
 export const isProd = () => {
   return import.meta.env.PROD;
 };
+
+export const extractNumber = (text: string) => {
+  if (!text) return 0;
+  const numStr = text.replace(/[^0-9.]/g, "");
+  return parseFloat(numStr) || 0;
+};

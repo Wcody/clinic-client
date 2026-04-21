@@ -10,6 +10,10 @@ const props = defineProps({
   lastWeekData: {
     type: Array as PropType<Array<number>>,
     default: () => []
+  },
+  daysData: {
+    type: Array as PropType<Array<string>>,
+    default: () => ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
   }
 });
 
@@ -51,7 +55,7 @@ watch(
       xAxis: [
         {
           type: "category",
-          data: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+          data: props.daysData,
           axisLabel: {
             fontSize: "0.875rem"
           },

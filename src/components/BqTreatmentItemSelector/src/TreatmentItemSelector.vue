@@ -277,6 +277,7 @@ function openDropdown() {
 function closeDropdown() {
   visible.value = false;
   activeIndex.value = -1;
+  keyword.value = "";
 }
 
 function handleTriggerClick(e: MouseEvent) {

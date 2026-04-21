@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Search, Delete } from "@element-plus/icons-vue";
 import BqMedicineSelector from "@/components/BqMedicineSelector";
@@ -23,44 +23,90 @@ import {
   type BQMedicalDictionaryEntityType
 } from "@/api/cm/medicalDictionary";
 import { BQSearchFilter } from "@/api/api";
+import WesternTemplateItems from "./comp/WesternTemplateItems.vue";
+import ChineseTemplateItems from "./comp/ChineseTemplateItems.vue";
 
 defineOptions({
   name: "TemplatePrescriptionIndex"
 });
 
-// ─── Types ─────────────────────────────────────────────────────
-type DrugItem = {
-  id: string;
-  drugId: string;
-  drugName: string;
-  quantity: number;
-  unit: string;
-  decoctionMethod: string;
-};
+// 前端使用的药品明细列表（用于编辑）
+const drugItems = ref<BQPrescriptionTemplateDetailEntityType[]>([]);
 
+// 医疗字典数据（用法、频率、单位、煎药方式）
+const usageOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+const frequenceOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+const unitOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+const decoctionOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+
+// 状态变量
 const listLoading = ref(false);
 const formLoading = ref(false);
 const treeData = ref<any[]>([]);
 const selectedId = ref("");
 const isNew = ref(false);
-const isCategoryNode = ref(false); // 标记当前选中的是否为目录节点
+const isCategoryNode = ref(false);
+const isEditing = ref(false);
+const isLoading = ref(false);
 const searchKeyword = ref("");
+const isDirty = ref(false);
 const addDrugInputText = ref("");
+const firstLevelCustomName = ref("");
+const secondLevelCustomName = ref("");
+const chineseTemplateRef = ref<InstanceType<typeof ChineseTemplateItems> | null>(null);
 
 const form = reactive<BQPrescriptionTemplateEntityType>(
   getPrescriptionTemplateEntityDefault()
 );
 const metaInfo = reactive({ updatedTime: "", updatedBy: "" });
 
-// 前端使用的药品列表（用于编辑）
-const drugItems = ref<DrugItem[]>([]);
-
-// 医疗字典数据（单位、煎药方式）
-const unitOptions = ref<BQMedicalDictionaryEntityType[]>([]);
-const decoctionOptions = ref<BQMedicalDictionaryEntityType[]>([]);
-
 // ─── 计算属性 ─────────────────────────────────────────────────
 const hasSelected = computed(() => !!selectedId.value || isNew.value);
+const canEdit = computed(() => !!selectedId.value && !isNew.value && !isCategoryNode.value);
+const canDelete = computed(() => !!selectedId.value && !isNew.value && !isCategoryNode.value);
+const formDisabled = computed(() => !isNew.value && !isEditing.value);
+
+// 当前选中节点是否为目录且无子节点（可删除）
+const canDeleteCategory = computed(() => {
+  if (!isCategoryNode.value || !selectedId.value) return false;
+  const node = findNodeById(treeData.value, selectedId.value);
+  return node && (!node.children || node.children.length === 0);
+});
+
+// 根据ID查找树节点
+const findNodeById = (nodes: any[], id: string): any => {
+  for (const node of nodes) {
+    if (String(node.id) === id) return node;
+    if (node.children && node.children.length > 0) {
+      const found = findNodeById(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+// 一级目录选项
+const firstLevelOptions = computed(() => {
+  return treeData.value
+    .filter(node => node.hasCategory)
+    .map(node => ({
+      id: node.id,
+      name: node.name
+    }));
+});
+
+// 二级目录选项
+const secondLevelOptions = computed(() => {
+  if (!form.oneLevel) return [];
+  const parentNode = treeData.value.find(node => node.id === form.oneLevel);
+  if (!parentNode || !parentNode.children) return [];
+  return parentNode.children
+    .filter((child: any) => child.hasCategory)
+    .map((child: any) => ({
+      id: child.id,
+      name: child.name
+    }));
+});
 
 // 过滤后的树形数据（本地搜索）
 const filteredTreeData = computed(() => {
@@ -98,6 +144,47 @@ const filteredTreeData = computed(() => {
   return filterNodes(treeData.value);
 });
 
+// 监听表单变化，标记脏值
+watch(
+  () => ({ ...form }),
+  () => {
+    if (hasSelected.value && !isCategoryNode.value && !isLoading.value) {
+      isDirty.value = true;
+    }
+  },
+  { deep: true }
+);
+
+// 监听一级目录变化
+watch(
+  () => form.oneLevel,
+  (newVal) => {
+    // 当切换一级目录时，清空二级目录选择
+    if (!isLoading.value) {
+      form.twoLevel = null;
+    }
+    // 如果是字符串（自由录入），保存自定义名称
+    if (typeof newVal === "string" && newVal) {
+      firstLevelCustomName.value = newVal;
+    } else {
+      firstLevelCustomName.value = "";
+    }
+  }
+);
+
+// 监听二级目录变化
+watch(
+  () => form.twoLevel,
+  (newVal) => {
+    // 如果是字符串（自由录入），保存自定义名称
+    if (typeof newVal === "string" && newVal) {
+      secondLevelCustomName.value = newVal;
+    } else {
+      secondLevelCustomName.value = "";
+    }
+  }
+);
+
 // 高亮关键字的辅助函数（使用 render 函数方式）
 const highlightKeyword = (text: string, keyword: string) => {
   if (!keyword || !text) {
@@ -111,68 +198,6 @@ const highlightKeyword = (text: string, keyword: string) => {
   return text.replace(regex, '<span class="highlight-keyword">$1</span>');
 };
 
-// 自定义树节点渲染函数
-const renderTreeNode = (h: any, { node, data }: any) => {
-  const keyword = searchKeyword.value.trim();
-  let labelContent = node.label;
-
-  // 如果有搜索关键字，进行高亮处理
-  if (keyword && labelContent) {
-    const regex = new RegExp(
-      `(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-      "gi"
-    );
-    const parts = labelContent.split(regex);
-
-    return h(
-      "span",
-      {
-        class: [
-          "text-[13px] select-none truncate w-full",
-          data.hasCategory
-            ? "font-medium text-[var(--el-text-color-primary)]"
-            : "text-[var(--el-text-color-regular)]"
-        ],
-        title: node.label
-      },
-      parts.map((part: string, index: number) => {
-        if (part.toLowerCase() === keyword.toLowerCase()) {
-          return h(
-            "span",
-            {
-              key: index,
-              style: {
-                color: "#409eff",
-                fontWeight: "bold",
-                backgroundColor: "#ecf5ff",
-                padding: "0 2px",
-                borderRadius: "2px"
-              }
-            },
-            part
-          );
-        }
-        return part;
-      })
-    );
-  }
-
-  // 无搜索关键字时正常显示
-  return h(
-    "span",
-    {
-      class: [
-        "text-[13px] select-none truncate w-full",
-        data.hasCategory
-          ? "font-medium text-[var(--el-text-color-primary)]"
-          : "text-[var(--el-text-color-regular)]"
-      ],
-      title: node.label
-    },
-    labelContent
-  );
-};
-
 // ─── 数据加载 ─────────────────────────────────────────────────
 const loadTreeData = async () => {
   listLoading.value = true;
@@ -180,6 +205,7 @@ const loadTreeData = async () => {
     const res = await getPrescriptionTemplateTreeApi();
     if (res.code === 0 && res.data) {
       treeData.value = res.data;
+      console.log("树形数据:", JSON.stringify(res.data, null, 2));
     } else {
       ElMessage.error(res.errMsg || res.message || "加载树形数据失败");
     }
@@ -195,6 +221,36 @@ const loadTreeData = async () => {
 const loadMedicalDictionaries = async () => {
   console.log("开始加载医疗字典数据...");
   try {
+    // 加载用法列表 (dictType=1)
+    console.log("请求用法列表, dictType=1");
+    const usageRes = await getMedicalDictionaryListApi({
+      filters: [new BQSearchFilter("dictType", "eq", "1")]
+    });
+    console.log("用法列表响应:", usageRes);
+    if (usageRes.code === 0 && usageRes.data) {
+      usageOptions.value = usageRes.data.filter(
+        (item: any) => item.status !== false
+      );
+      console.log("用法列表加载成功，数量:", usageOptions.value.length);
+    } else {
+      console.warn("用法列表加载失败:", usageRes);
+    }
+
+    // 加载频率列表 (dictType=2)
+    console.log("请求频率列表, dictType=2");
+    const frequenceRes = await getMedicalDictionaryListApi({
+      filters: [new BQSearchFilter("dictType", "eq", "2")]
+    });
+    console.log("频率列表响应:", frequenceRes);
+    if (frequenceRes.code === 0 && frequenceRes.data) {
+      frequenceOptions.value = frequenceRes.data.filter(
+        (item: any) => item.status !== false
+      );
+      console.log("频率列表加载成功，数量:", frequenceOptions.value.length);
+    } else {
+      console.warn("频率列表加载失败:", frequenceRes);
+    }
+
     // 加载单位列表 (dictType=3)
     console.log("请求单位列表, dictType=3");
     const unitRes = await getMedicalDictionaryListApi({
@@ -247,30 +303,10 @@ const loadTemplateDetails = async (templateId: string) => {
         (detail: BQPrescriptionTemplateDetailEntityType) => {
           console.log("处理明细项:", detail);
 
-          // 根据单位ID查找单位名称
-          const unitName =
-            detail.quantityUnit !== undefined && detail.quantityUnit !== null
-              ? unitOptions.value.find(u => u.id === detail.quantityUnit)
-                  ?.name || "g"
-              : "g";
-
-          // 根据煎药方式ID查找名称
-          const decoctionName =
-            detail.cookingType !== undefined && detail.cookingType !== null
-              ? decoctionOptions.value.find(d => d.id === detail.cookingType)
-                  ?.name || ""
-              : "";
-
           return {
-            id: detail.id
-              ? String(detail.id)
-              : `item-${Date.now()}-${Math.random()}`,
-            drugId: detail.drugId || "",
-            drugName: detail.drugName || "",
-            quantity: detail.quantity || 0,
-            unit: unitName,
-            decoctionMethod: decoctionName
-          };
+            ...detail,
+            id: detail.id ?? `item-${Date.now()}-${Math.random()}`
+          } as BQPrescriptionTemplateDetailEntityType;
         }
       );
 
@@ -288,17 +324,26 @@ const loadTemplateDetails = async (templateId: string) => {
 
 // ─── 操作 ─────────────────────────────────────────────────────
 const handleNodeClick = async (data: any) => {
-  selectedId.value = String(data.id);
+  const targetId = String(data.id);
+
+  // 如果点击的是当前选中节点，不做处理
+  if (targetId === selectedId.value && !isNew.value) return;
+
+  selectedId.value = targetId;
+  isEditing.value = false;
+  isDirty.value = false;
+  // 清空自定义目录名称
+  firstLevelCustomName.value = "";
+  secondLevelCustomName.value = "";
+  form.twoLevel = null;
 
   if (data.hasCategory) {
-    // 点击的是目录节点
     isCategoryNode.value = true;
     isNew.value = false;
-    // 清空表单，显示目录属性编辑界面
     Object.assign(
       form,
       getPrescriptionTemplateEntityDefault({
-        eid: String(data.id), // 将Integer转换为string
+        eid: String(data.id),
         name: data.name,
         hasCategory: true,
         parentId: data.parentId
@@ -308,13 +353,14 @@ const handleNodeClick = async (data: any) => {
     metaInfo.updatedTime = "";
     metaInfo.updatedBy = "";
   } else {
-    // 点击的是叶子节点（模板）
     isCategoryNode.value = false;
-    await selectTemplate(String(data.id)); // 确保传递string类型
+    isNew.value = false;
+    await selectTemplate(String(data.id));
   }
 };
 
 const selectTemplate = async (templateId: string) => {
+  isLoading.value = true;
   console.log("=== 开始加载模板详情 ===");
   console.log("模板ID:", templateId);
 
@@ -338,6 +384,7 @@ const selectTemplate = async (templateId: string) => {
 
       metaInfo.updatedTime = item.updateTime ?? item.createdTime ?? "";
       metaInfo.updatedBy = item.updatedBy ?? item.createdBy ?? "";
+      isDirty.value = false;
 
       // 加载明细 - 使用正确的 id
       console.log("准备加载明细，templateId:", id);
@@ -351,6 +398,8 @@ const selectTemplate = async (templateId: string) => {
   } catch (error) {
     console.error("加载模板详情失败:", error);
     ElMessage.error("加载模板详情失败");
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -358,9 +407,14 @@ const handleAdd = (isCategory: boolean = false) => {
   selectedId.value = "";
   isNew.value = true;
   isCategoryNode.value = isCategory;
+  isEditing.value = false;
+  isDirty.value = false;
+  // 清空自定义目录名称
+  firstLevelCustomName.value = "";
+  secondLevelCustomName.value = "";
+  form.twoLevel = null;
 
   if (isCategory) {
-    // 新增目录
     Object.assign(
       form,
       getPrescriptionTemplateEntityDefault({
@@ -369,7 +423,6 @@ const handleAdd = (isCategory: boolean = false) => {
       } as any)
     );
   } else {
-    // 新增模板
     Object.assign(
       form,
       getPrescriptionTemplateEntityDefault({
@@ -407,6 +460,8 @@ const handleSave = async () => {
         const res = await addPrescriptionTemplateApi(submitData);
         if (res.code === 0 && res.data) {
           templateId = res.data.id;
+          isNew.value = false;
+          isEditing.value = false;
           ElMessage.success("目录保存成功");
         } else {
           ElMessage.error(res.errMsg || res.message || "保存失败");
@@ -415,6 +470,7 @@ const handleSave = async () => {
       } else {
         const res = await updatePrescriptionTemplateApi(submitData);
         if (res.code === 0 && res.data) {
+          isEditing.value = false;
           ElMessage.success("目录更新成功");
         } else {
           ElMessage.error(res.errMsg || res.message || "保存失败");
@@ -423,33 +479,166 @@ const handleSave = async () => {
       }
     } else {
       // 保存模板节点
-      if (isNew.value) {
-        // 新增主表
-        const submitData = {
-          ...form,
-          hasCategory: false,
+      // 处理目录层级的逻辑
+      let finalOneLevel: number | null = null;
+      let finalTwoLevel: number | null = null;
+      let finalParentId: number | null = null;
+
+      // 检查一级目录是否是自由录入
+      const isFirstLevelCustom = typeof form.oneLevel === "string" && form.oneLevel;
+      // 检查二级目录是否是自由录入
+      const isSecondLevelCustom = typeof form.twoLevel === "string" && form.twoLevel;
+
+      if (isFirstLevelCustom) {
+        // 一级目录是自由录入，需要先创建
+        let firstLevelId: number | null = null;
+
+        if (isSecondLevelCustom) {
+          // 同时有自由录入的一级和二级目录
+          // 先创建一级目录
+          const firstLevelData = {
+            name: form.oneLevel,
+            hasCategory: true,
+            parentId: 0,
+            status: true,
+            createdTime: now,
+            updatedTime: now
+          };
+          const firstRes = await addPrescriptionTemplateApi(firstLevelData);
+          if (firstRes.code === 0 && firstRes.data) {
+            firstLevelId = firstRes.data.id;
+            finalOneLevel = firstLevelId;
+          } else {
+            ElMessage.error("一级目录保存失败");
+            return;
+          }
+
+          // 创建二级目录，parentId指向一级目录
+          const secondLevelData = {
+            name: form.twoLevel,
+            hasCategory: true,
+            parentId: firstLevelId,
+            status: true,
+            createdTime: now,
+            updatedTime: now
+          };
+          const secondRes = await addPrescriptionTemplateApi(secondLevelData);
+          if (secondRes.code === 0 && secondRes.data) {
+            finalTwoLevel = secondRes.data.id;
+            finalParentId = secondRes.data.id;
+          } else {
+            ElMessage.error("二级目录保存失败");
+            return;
+          }
+        } else if (form.twoLevel) {
+          // 一级自由录入，二级选择现有目录
+          // 先创建一级目录
+          const firstLevelData = {
+            name: form.oneLevel,
+            hasCategory: true,
+            parentId: 0,
+            status: true,
+            createdTime: now,
+            updatedTime: now
+          };
+          const firstRes = await addPrescriptionTemplateApi(firstLevelData);
+          if (firstRes.code === 0 && firstRes.data) {
+            firstLevelId = firstRes.data.id;
+            finalOneLevel = firstLevelId;
+            finalParentId = firstLevelId;
+          } else {
+            ElMessage.error("一级目录保存失败");
+            return;
+          }
+          // 二级目录使用选择的现有目录
+          finalTwoLevel = Number(form.twoLevel);
+        } else {
+          // 只有一级自由录入，没有二级目录
+          const firstLevelData = {
+            name: form.oneLevel,
+            hasCategory: true,
+            parentId: 0,
+            status: true,
+            createdTime: now,
+            updatedTime: now
+          };
+          const firstRes = await addPrescriptionTemplateApi(firstLevelData);
+          if (firstRes.code === 0 && firstRes.data) {
+            finalOneLevel = firstRes.data.id;
+            finalParentId = firstRes.data.id;
+          } else {
+            ElMessage.error("一级目录保存失败");
+            return;
+          }
+        }
+      } else if (isSecondLevelCustom) {
+        // 一级选择现有目录，二级自由录入
+        // 先创建二级目录
+        const secondLevelData = {
+          name: form.twoLevel,
+          hasCategory: true,
+          parentId: Number(form.oneLevel),
+          status: true,
           createdTime: now,
           updatedTime: now
         };
+        const secondRes = await addPrescriptionTemplateApi(secondLevelData);
+        if (secondRes.code === 0 && secondRes.data) {
+          finalTwoLevel = secondRes.data.id;
+          finalOneLevel = Number(form.oneLevel);
+          finalParentId = secondRes.data.id;
+        } else {
+          ElMessage.error("二级目录保存失败");
+          return;
+        }
+      } else {
+        // 都选择现有目录，直接使用
+        // 如果oneLevel为0或空，则twoLevel和parentId都为0
+        if (!form.oneLevel) {
+          finalOneLevel = 0;
+          finalTwoLevel = 0;
+          finalParentId = 0;
+        } else if (form.twoLevel) {
+          finalTwoLevel = Number(form.twoLevel);
+          finalOneLevel = Number(form.oneLevel);
+          finalParentId = Number(form.twoLevel);
+        } else if (form.oneLevel) {
+          finalOneLevel = Number(form.oneLevel);
+          finalParentId = Number(form.oneLevel);
+        }
+      }
+
+      // 清空自由录入的临时变量
+      firstLevelCustomName.value = "";
+      secondLevelCustomName.value = "";
+
+      // 构建保存数据
+      const submitData = {
+        ...form,
+        hasCategory: false,
+        oneLevel: finalOneLevel,
+        twoLevel: finalTwoLevel,
+        parentId: finalParentId,
+        updatedTime: now
+      };
+
+      if (isNew.value) {
+        submitData.createdTime = now;
 
         const res = await addPrescriptionTemplateApi(submitData);
         if (res.code === 0 && res.data) {
           templateId = res.data.id;
+          isNew.value = false;
+          isEditing.value = false;
           ElMessage.success("模板保存成功");
         } else {
           ElMessage.error(res.errMsg || res.message || "保存失败");
           return;
         }
       } else {
-        // 更新主表
-        const submitData = {
-          ...form,
-          hasCategory: false,
-          updatedTime: now
-        };
-
         const res = await updatePrescriptionTemplateApi(submitData);
         if (res.code === 0 && res.data) {
+          isEditing.value = false;
           ElMessage.success("模板更新成功");
         } else {
           ElMessage.error(res.errMsg || res.message || "保存失败");
@@ -493,10 +682,15 @@ const handleSave = async () => {
                 templateId: Number(templateId),
                 drugId: item.drugId,
                 drugName: item.drugName,
+                specification: item.specification || "",
                 quantity: item.quantity,
-                quantityUnit: findUnitIdByName(item.unit), // 将名称转换为ID
-                cookingType: findDecoctionIdByName(item.decoctionMethod), // 将名称转换为ID
-                sort: 0
+                quantityUnit: item.quantityUnit,
+                singleUsageAmount: item.singleUsageAmount,
+                singleUsageUnit: item.singleUsageUnit,
+                cookingType: item.cookingType,
+                days: item.days,
+                groupNo: item.groupNo,
+                sort: item.sort ?? 0
               };
 
               await addPrescriptionTemplateDetailApi(detailData);
@@ -511,6 +705,7 @@ const handleSave = async () => {
 
     // 重新加载树形数据
     await loadTreeData();
+    isDirty.value = false;
   } catch (error) {
     console.error("保存失败:", error);
     ElMessage.error("保存失败");
@@ -522,25 +717,24 @@ const handleSave = async () => {
 const handleCancel = () => {
   if (isNew.value) {
     isNew.value = false;
-    // 取消新增时，如果有选中的节点，重新加载该节点详情（如果需要恢复原状）
-    // 由于树形结构数据可能在 loadTreeData 中获取，这里简单处理：
-    // 如果之前有选中 ID，尝试在 treeData 中查找并重新 select
-    if (selectedId.value) {
-      // 简单递归查找或直接依赖用户重新点击
-      // 为了体验，最好能恢复之前的状态。
-      // 这里暂时不做复杂恢复，仅重置状态
-    }
-  } else {
-    // 编辑模式下取消，重新加载当前选中模板的详情
-    if (selectedId.value) {
-      // 需要在 treeData 中找到对应的 template 对象
-      // 由于 treeData 结构可能嵌套，这里简化处理：
-      // 实际上 selectTemplate 需要完整的 entity 对象。
-      // 如果我们在 handleNodeClick 中保存了当前选中的完整对象会更好。
-      // 暂时假设用户会重新点击或我们只重置表单脏数据
-      // 更好的做法：在 selectTemplate 时备份原始数据
-    }
+    isCategoryNode.value = false;
+    Object.assign(form, getPrescriptionTemplateEntityDefault());
+    metaInfo.updatedTime = "";
+    metaInfo.updatedBy = "";
+  } else if (selectedId.value) {
+    selectTemplate(selectedId.value);
   }
+  isEditing.value = false;
+  isDirty.value = false;
+  // 清空自定义目录名称
+  firstLevelCustomName.value = "";
+  secondLevelCustomName.value = "";
+  form.twoLevel = null;
+};
+
+const handleEdit = () => {
+  if (!canEdit.value) return;
+  isEditing.value = true;
 };
 
 // 停用/启用状态变化处理
@@ -587,11 +781,36 @@ const findDecoctionIdByName = (decoctionName: string): number | undefined => {
   return decoction?.id;
 };
 
+// 获取单位ID（可能是id数字，也可能是名称字符串）
+const resolveUnitId = (value: any): number | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return findUnitIdByName(value);
+  return undefined;
+};
+
+// 获取煎药方式ID（可能是id数字，也可能是名称字符串）
+const resolveDecoctionId = (value: any): number | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return findDecoctionIdByName(value);
+  return undefined;
+};
+
 const handleDelete = async () => {
   if (!selectedId.value) return;
 
+  // 目录节点且有子节点，不允许删除
+  if (isCategoryNode.value) {
+    const node = findNodeById(treeData.value, selectedId.value);
+    if (node && node.children && node.children.length > 0) {
+      ElMessage.warning("该目录下存在子节点，无法删除");
+      return;
+    }
+  }
+
   const confirmMsg = isCategoryNode.value
-    ? "确认删除该目录？如果目录下有子节点，将无法删除。"
+    ? "确认删除该目录？删除后不可恢复。"
     : "确认删除该模板？删除后不可恢复。";
 
   await ElMessageBox.confirm(confirmMsg, "提示", {
@@ -607,6 +826,8 @@ const handleDelete = async () => {
       selectedId.value = "";
       isNew.value = false;
       isCategoryNode.value = false;
+      isEditing.value = false;
+      isDirty.value = false;
       drugItems.value = [];
       metaInfo.updatedTime = "";
       metaInfo.updatedBy = "";
@@ -623,15 +844,28 @@ const handleDelete = async () => {
 
 // ─── 药品操作 ─────────────────────────────────────────────────
 const handleDrugSelect = (medicine: any) => {
+  const isWestern = form.prescriptionType === 1;
+  const singleUsage = isWestern ? (medicine.singleDosage ?? 0) : 1;
   drugItems.value.push({
     id: `item-${Date.now()}`,
     drugId: String(medicine.id ?? ""),
     drugName: medicine.name,
-    quantity: 10,
-    unit: "g",
-    decoctionMethod: ""
-  });
+    specification: medicine.spec ?? "",
+    singleUsageAmount: singleUsage,
+    singleUsageUnit: isWestern ? resolveUnitId(medicine.unitId) : resolveUnitId(medicine.unitId),
+    quantityUnit: isWestern ? undefined : resolveUnitId(medicine.unitId),
+    quantity: 0,
+    cookingType: isWestern ? undefined : resolveDecoctionId(medicine.decoWay),
+    days: form.days ?? (isWestern ? 7 : 7),
+    groupNo: 1,
+    sort: 0,
+    price: parseFloat(medicine.price || "0") || 0
+  } as BQPrescriptionTemplateDetailEntityType);
   addDrugInputText.value = "";
+  // 中药处方添加后重新计算所有行的计价总量
+  if (!isWestern) {
+    chineseTemplateRef.value?.recalculateAll();
+  }
 };
 
 const removeDrugItem = (index: number) => {
@@ -662,6 +896,7 @@ onMounted(() => {
           clearable
           size="small"
           class="flex-1"
+          :disabled="isNew || isEditing"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -670,7 +905,7 @@ onMounted(() => {
       </div>
 
       <!-- 树形列表 -->
-      <div v-loading="listLoading" class="flex-1 overflow-y-auto py-1">
+      <div v-loading="listLoading" class="flex-1 overflow-y-auto py-1" :class="{ 'pointer-events-none opacity-60': isNew || isEditing }">
         <el-empty
           v-if="filteredTreeData.length === 0"
           description="暂无数据"
@@ -686,9 +921,21 @@ onMounted(() => {
           default-expand-all
           highlight-current
           :expand-on-click-node="false"
-          :render-content="renderTreeNode"
           @node-click="handleNodeClick"
-        />
+        >
+          <template #default="{ node, data }">
+            <span class="tree-node-content">
+              <span class="node-label" v-html="highlightKeyword(node.label, searchKeyword)"></span>
+              <span
+                v-if="!data.hasCategory && data.prescriptionType"
+                :style="{ color: data.prescriptionType === 1 ? '#409eff' : '#67c23a' }"
+                class="node-type"
+              >
+                [{{ data.prescriptionType === 1 ? '西药' : '中药' }}]
+              </span>
+            </span>
+          </template>
+        </el-tree>
       </div>
     </div>
 
@@ -699,38 +946,27 @@ onMounted(() => {
         class="h-[44px] shrink-0 flex items-center justify-between px-4 border-b border-[var(--el-border-color-light)]"
       >
         <div class="flex items-center gap-2">
-          <!-- <el-button type="primary" size="small" @click="handleAdd(false)"
-            >+ 新增模板</el-button
-          >
-          <el-button type="success" size="small" @click="handleAdd(true)"
-            >+ 新增目录</el-button
-          > -->
+          <el-button type="primary" size="small" @click="handleAdd(false)">+ 新增模板</el-button>
         </div>
         <div class="flex items-center gap-2">
-          <!-- <el-button
-            type="primary"
-            size="small"
-            :loading="formLoading"
-            :disabled="!hasSelected"
-            @click="handleSave"
-          >
-            保存
-          </el-button>
-          <el-button
-            size="small"
-            :disabled="!hasSelected"
-            @click="handleCancel"
-          >
-            取消
-          </el-button>
-          <el-button
-            type="danger"
-            size="small"
-            :disabled="isNew || !selectedId"
-            @click="handleDelete"
-          >
-            删除
-          </el-button> -->
+          <!-- 修改模式/新增模式：显示保存和取消 -->
+          <template v-if="isEditing || isNew">
+            <el-button type="primary" size="small" :loading="formLoading" @click="handleSave">
+              保存
+            </el-button>
+            <el-button size="small" @click="handleCancel">
+              取消
+            </el-button>
+          </template>
+          <!-- 默认模式：显示修改和删除 -->
+          <template v-else>
+            <el-button type="primary" size="small" :disabled="!canEdit" @click="handleEdit">
+              修改
+            </el-button>
+            <el-button type="danger" size="small" :disabled="!canDelete && !canDeleteCategory" @click="handleDelete">
+              删除
+            </el-button>
+          </template>
         </div>
       </div>
 
@@ -795,33 +1031,75 @@ onMounted(() => {
             <el-input
               v-model="form.name"
               placeholder="请输入模板名称"
-              disabled
+              :disabled="formDisabled"
             />
           </el-form-item>
 
-          <!-- 模板类别 + 处方类型 -->
+          <!-- 模板类别 + 处方类型 + 一级目录 + 二级目录 -->
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="6">
               <el-form-item label="模板类别">
                 <el-select
                   v-model="form.templateType"
                   style="width: 100%"
-                  disabled
+                  :disabled="formDisabled"
                 >
-                  <el-option label="个人" :value="false" />
-                  <el-option label="公共" :value="true" />
+                  <el-option label="个人" :value="1" />
+                  <el-option label="诊所" :value="2" />
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="6">
               <el-form-item label="处方类型">
                 <el-select
                   v-model="form.prescriptionType"
                   style="width: 100%"
-                  disabled
+                  :disabled="formDisabled"
                 >
-                  <el-option label="中药" :value="true" />
-                  <el-option label="西药" :value="false" />
+                  <el-option label="西药" :value="1" />
+                  <el-option label="中药" :value="2" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="一级目录">
+                <el-select
+                  v-model="form.oneLevel"
+                  style="width: 100%"
+                  :disabled="formDisabled"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  placeholder="请选择或输入"
+                >
+                  <el-option
+                    v-for="item in firstLevelOptions"
+                    :key="item.id"
+                    :label="item.name"
+                    :value="item.id"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="二级目录">
+                <el-select
+                  v-model="form.twoLevel"
+                  style="width: 100%"
+                  :disabled="formDisabled"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  placeholder="请选择或输入"
+                >
+                  <el-option
+                    v-for="item in secondLevelOptions"
+                    :key="item.id"
+                    :label="item.name"
+                    :value="item.id"
+                  />
                 </el-select>
               </el-form-item>
             </el-col>
@@ -834,12 +1112,12 @@ onMounted(() => {
               type="textarea"
               :rows="5"
               placeholder="请输入处方描述/医嘱"
-              disabled
+              :disabled="formDisabled"
             />
           </el-form-item>
 
-          <!-- 剂数 + 频率 + 用法 -->
-          <div class="flex items-center gap-4 mb-4 pl-[90px]">
+          <!-- 剂数 + 频率 + 用法 + 天数（仅中药处方显示） -->
+          <div v-if="form.prescriptionType === 2" class="flex items-center gap-4 mb-4 pl-[90px]">
             <div class="flex items-center gap-2">
               <span class="field-label">剂数</span>
               <el-input-number
@@ -848,136 +1126,116 @@ onMounted(() => {
                 :max="999"
                 :controls="false"
                 style="width: 72px"
-                disabled
+                :disabled="formDisabled"
               />
             </div>
             <div class="flex items-center gap-2">
               <span class="field-label">频率</span>
-              <el-select v-model="form.frequence" style="width: 160px" disabled>
-                <el-option label="每日一次" :value="1" />
-                <el-option label="每日两次" :value="2" />
-                <el-option label="每日三次" :value="3" />
-                <el-option label="每日四次" :value="4" />
+              <el-select v-model="form.frequence" style="width: 160px" :disabled="formDisabled">
+                <el-option
+                  v-for="item in frequenceOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
               </el-select>
             </div>
             <div class="flex items-center gap-2">
               <span class="field-label">用法</span>
-              <el-select v-model="form.usageType" style="width: 120px" disabled>
-                <el-option label="口服" :value="1" />
-                <el-option label="外用" :value="2" />
-                <el-option label="注射" :value="3" />
+              <el-select v-model="form.usageType" style="width: 120px" :disabled="formDisabled">
+                <el-option
+                  v-for="item in usageOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
               </el-select>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="field-label">天数</span>
+              <el-input-number
+                v-model="form.days"
+                :min="1"
+                :max="999"
+                :controls="false"
+                style="width: 72px"
+                :disabled="formDisabled"
+              />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="field-label">医嘱</span>
+              <el-input
+                v-model="form.recommendation"
+                style="width: 200px"
+                placeholder="医嘱"
+                :disabled="formDisabled"
+              />
             </div>
           </div>
 
-          <!-- 药品明细表 -->
+          <!-- 药品明细表 - 根据处方类型切换 -->
           <div class="drug-table-wrapper">
-            <table class="drug-table">
-              <thead>
-                <tr>
-                  <th style="width: 200px">药品名称</th>
-                  <th style="width: 180px">数量</th>
-                  <th style="width: 160px">煎药方式</th>
-                  <th style="width: 80px">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="drugItems.length === 0">
-                  <td colspan="4" class="empty-row">
-                    暂无药品，请在下方搜索添加
-                  </td>
-                </tr>
-                <tr v-for="(item, index) in drugItems" :key="item.id">
-                  <td class="drug-name-cell">
-                    {{ index + 1 }}. {{ item.drugName }}
-                  </td>
-                  <td>
-                    <div class="qty-cell">
-                      <el-input-number
-                        v-model="item.quantity"
-                        :min="0"
-                        :precision="2"
-                        :controls="false"
-                        class="qty-input"
-                        disabled
-                      />
-                      <el-select
-                        v-model="item.unit"
-                        class="unit-select"
-                        disabled
-                        placeholder="请选择单位"
-                      >
-                        <el-option
-                          v-for="unit in unitOptions"
-                          :key="unit.id"
-                          :label="unit.name"
-                          :value="unit.name"
-                        />
-                      </el-select>
-                    </div>
-                  </td>
-                  <td>
-                    <el-select
-                      v-model="item.decoctionMethod"
-                      clearable
-                      placeholder="请选择煎药方式"
-                      class="decoction-select"
-                      disabled
-                    >
-                      <el-option
-                        v-for="decoction in decoctionOptions"
-                        :key="decoction.id"
-                        :label="decoction.name"
-                        :value="decoction.name"
-                      />
-                    </el-select>
-                  </td>
-                  <td class="action-cell">
-                    <!-- 暂时隐藏删除按钮 -->
-                    <!-- <el-button
-                      type="danger"
-                      link
-                      :icon="Delete"
-                      @click="removeDrugItem(index)"
-                    /> -->
-                  </td>
-                </tr>
-                <!-- 底部药品选择行 - 暂时隐藏 -->
-                <!-- <tr>
-                  <td colspan="4" class="selector-row">
-                    <BqMedicineSelector
-                      v-model="addDrugInputText"
-                      placeholder="请输入药品名称搜索并添加"
-                      @select="handleDrugSelect"
-                    />
-                  </td>
-                </tr> -->
-              </tbody>
-            </table>
+            <!-- 西药模板明细 -->
+            <WesternTemplateItems
+              v-if="form.prescriptionType === 1"
+              :items="drugItems"
+              :disabled="formDisabled"
+              :unit-options="unitOptions"
+              :usage-options="usageOptions"
+              :frequency-options="frequenceOptions"
+              @remove="removeDrugItem"
+            />
+
+            <!-- 中药模板明细 -->
+            <ChineseTemplateItems
+              ref="chineseTemplateRef"
+              v-else-if="form.prescriptionType === 2"
+              :items="drugItems"
+              :disabled="formDisabled"
+              :unit-options="unitOptions"
+              :deco-options="decoctionOptions"
+              :dose-amount="form.doseAmount"
+              :days="form.days"
+              :frequence-options="frequenceOptions"
+              :frequence="form.frequence"
+              @remove="removeDrugItem"
+            />
           </div>
 
           <!-- 底部状态栏 -->
           <div
-            class="flex items-center justify-end gap-6 mt-3 text-[12px] text-[var(--el-text-color-secondary)]"
+            class="flex items-center justify-between gap-6 mt-3 text-[12px] text-[var(--el-text-color-secondary)]"
           >
-            <div class="flex items-center gap-2">
-              <span>状态：</span>
-              <el-switch
-                v-model="form.status"
-                active-text="启用"
-                inactive-text="停用"
-                :disabled="isNew"
-                @change="handleStatusChange"
-              />
+            <!-- 左侧：选择药品组件 -->
+            <BqMedicineSelector
+              v-model="addDrugInputText"
+              placeholder="输入药品名称搜索添加"
+              style="width: 280px"
+              :disabled="formDisabled"
+              @select="handleDrugSelect"
+            />
+
+            <!-- 右侧：状态信息 -->
+            <div class="flex items-center gap-6">
+              <div class="flex items-center gap-2">
+                <span>状态：</span>
+                <el-switch
+                  v-model="form.status"
+                  active-text="启用"
+                  inactive-text="停用"
+                  :disabled="isNew"
+                  @change="handleStatusChange"
+                />
+              </div>
+              <span
+                >操作时间：{{
+                  metaInfo.updatedTime
+                    ? new Date(metaInfo.updatedTime).toLocaleString("zh-CN")
+                    : "-"
+                }}</span
+              >
+              <span>操作人：{{ metaInfo.updatedBy || "-" }}</span>
             </div>
-            <span
-              >操作时间：{{
-                metaInfo.updatedTime
-                  ? new Date(metaInfo.updatedTime).toLocaleString("zh-CN")
-                  : "-"
-              }}</span
-            >
-            <span>操作人：{{ metaInfo.updatedBy || "-" }}</span>
           </div>
         </el-form>
 
@@ -1005,6 +1263,24 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-text-color-regular);
   white-space: nowrap;
+}
+
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+
+.node-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-type {
+  color: #409eff;
+  font-size: 12px;
 }
 
 .drug-table-wrapper {
@@ -1096,14 +1372,14 @@ onMounted(() => {
     background-color: var(--el-fill-color-lighter);
     border-top: 1px solid var(--el-border-color-light);
   }
+}
 
-  // 搜索关键字高亮样式
-  :deep(.highlight-keyword) {
-    color: #409eff;
-    font-weight: bold;
-    background-color: #ecf5ff;
-    padding: 0 2px;
-    border-radius: 2px;
-  }
+// 搜索关键字高亮样式（放在 scoped 样式外面）
+:deep(.highlight-keyword) {
+  color: #000;
+  font-weight: bold;
+  background-color: #ffff00;
+  padding: 0 2px;
+  border-radius: 2px;
 }
 </style>

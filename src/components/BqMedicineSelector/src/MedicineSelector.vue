@@ -3,7 +3,7 @@
     <!-- 触发输入框 -->
     <div
       class="ms-trigger"
-      :class="{ 'ms-trigger--active': visible }"
+      :class="{ 'ms-trigger--active': visible, 'ms-trigger--disabled': props.disabled }"
       @click="handleTriggerClick"
     >
       <input
@@ -11,6 +11,8 @@
         v-model="keyword"
         :placeholder="placeholder"
         class="ms-input"
+        :disabled="props.disabled"
+        clearable
         autocomplete="off"
         @focus="handleInputFocus"
         @input="handleSearch"
@@ -45,13 +47,25 @@
           <el-checkbox v-model="filters.chinese" @change="handleFilterChange">
             中药
           </el-checkbox>
-          <el-checkbox v-model="filters.exam" style="display:none" @change="handleFilterChange">
+          <el-checkbox
+            v-model="filters.exam"
+            style="display: none"
+            @change="handleFilterChange"
+          >
             检查检验项目
           </el-checkbox>
-          <el-checkbox v-model="filters.treatment" style="display:none" @change="handleFilterChange">
+          <el-checkbox
+            v-model="filters.treatment"
+            style="display: none"
+            @change="handleFilterChange"
+          >
             处置项目
           </el-checkbox>
-          <el-checkbox v-model="filters.extra" style="display:none" @change="handleFilterChange">
+          <el-checkbox
+            v-model="filters.extra"
+            style="display: none"
+            @change="handleFilterChange"
+          >
             附加费
           </el-checkbox>
         </div>
@@ -77,7 +91,11 @@
               min-width="190"
             />
             <el-table-column prop="stock" label="库存" width="110" />
-            <el-table-column prop="price" label="价格" width="100" />
+            <el-table-column label="价格" width="100">
+              <template #default="{ row }">
+                {{ row.price }}{{ row.prescriptionUnit ? '/' + row.prescriptionUnit : '' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="source" label="来源" width="90" />
           </el-table>
         </div>
@@ -155,31 +173,53 @@ import { getDrugListApi } from "@/api/pharmacy/drug";
 import { getExamineItemListApi } from "@/api/pharmacy/examine";
 import { getTreatmentItemListApi } from "@/api/pharmacy/treatment";
 import { http } from "@/utils/http";
-import { BQSearchFilter, BQSearchOrder, type BQResultType, type BQSearchListResultType } from "@/api/api";
+import {
+  BQSearchFilter,
+  BQSearchOrder,
+  type BQResultType,
+  type BQSearchListResultType
+} from "@/api/api";
+import { key } from "localforage";
 
 // ---- 药品统一类型 ----
 export interface MedicineItem {
   id: string;
   name: string;
+  pinyin?: string;
   spec: string;
   manufacturer: string;
   stock: string;
   price: string;
   source: string;
-  category: "western" | "chinese" | "exam" | "treatment" | "extra";
-  prescriptionPrice?: string;
+  type?: number;
+  defaultSaleType?: number;
   specification?: string;
+  singleDosage?: string;
+  unitId?: number;
+  useWay?: string;
+  frequency?: string;
+  prescriptionPrice?: string; //散卖价格
+  prescriptionUnit?: string; //散卖单位
+  wholesalePrice?: string; //整卖价格
+  wholesaleUnit?: string; //整卖单位
+  conversionValue?: string; //整散比
+  decoWay?: string; //煎药方式
 }
 
 // ---- Props & Emits ----
 interface Props {
   modelValue?: string;
   placeholder?: string;
+  disabled?: boolean;
+  /** 默认过滤类型：western 西/成药，chinese 中药，不传则显示全部 */
+  filterType?: "western" | "chinese";
 }
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: "",
-  placeholder: "请输入药品名称搜索"
+  placeholder: "请输入药品名称搜索",
+  disabled: false,
+  filterType: undefined
 });
 
 const emit = defineEmits<{
@@ -213,11 +253,12 @@ const allTreatItems = ref<MedicineItem[]>([]);
 const allExtraItems = ref<MedicineItem[]>([]);
 
 const loadAllData = async () => {
-  if (dataLoaded.value) return;
   loading.value = true;
   try {
-    await Promise.all([loadDrugs(), loadExamItems(), loadTreatItems(), loadExtraItems()]);
-    dataLoaded.value = true;
+    await loadDrugs();
+    // await loadExamItems();
+    // await loadTreatItems();
+    // await loadExtraItems();
   } finally {
     loading.value = false;
   }
@@ -226,20 +267,31 @@ const loadAllData = async () => {
 const loadDrugs = async () => {
   try {
     const res = await getDrugListApi({
-      filters: [new BQSearchFilter("status", "eq", "启用")],
-      orders: [new BQSearchOrder("name")]
+      filters: [new BQSearchFilter("status", "eq", "1")],
+      orders: [new BQSearchOrder("updatedTime")]
     });
     allDrugs.value = (res.data ?? []).map(d => ({
-      id: d.eid ?? "",
+      id: d.id != null ? String(d.id) : "",
       name: d.name ?? "",
+      pinyin: d.pinyin ?? "",
       spec: d.specification ?? "",
       manufacturer: d.manufacturer ?? "",
       stock: d.stock ?? "",
       price: d.prescriptionPrice ?? "",
       source: "我的药库",
-      category: (d.typeString === "中药" ? "chinese" : "western") as MedicineItem["category"],
+      type: d.type,
       prescriptionPrice: d.prescriptionPrice,
-      specification: d.specification
+      prescriptionUnit: d.prescriptionUnit,
+      wholesalePrice: d.wholesalePrice,
+      wholesaleUnit: d.wholesaleUnit,
+      defaultSaleType: d.defaultSaleType,
+      specification: d.specification,
+      singleDosage: d.singleDosage,
+      unitId: d.unitId,
+      useWay: d.useWay,
+      frequency: d.frequency,
+      conversionValue: d.conversionValue,
+      decoWay: d.decoWay
     }));
   } catch {
     allDrugs.value = [];
@@ -260,7 +312,7 @@ const loadExamItems = async () => {
       stock: "",
       price: e.sellingPrice ?? "",
       source: "检验项目",
-      category: "exam" as MedicineItem["category"],
+      type: 101,
       prescriptionPrice: e.sellingPrice
     }));
   } catch {
@@ -282,7 +334,7 @@ const loadTreatItems = async () => {
       stock: "",
       price: t.sellingPrice ?? "",
       source: "处置项目",
-      category: "treatment" as MedicineItem["category"],
+      type: 102,
       prescriptionPrice: t.sellingPrice
     }));
   } catch {
@@ -310,7 +362,7 @@ const loadExtraItems = async () => {
       stock: "",
       price: a.sellingPrice ?? a.price ?? "",
       source: "附加费",
-      category: "extra" as MedicineItem["category"],
+      type: 103,
       prescriptionPrice: a.sellingPrice ?? a.price
     }));
   } catch {
@@ -320,12 +372,12 @@ const loadExtraItems = async () => {
 
 // 过滤条件
 const filters = reactive({
-  ownOnly: true,
-  western: false,
-  chinese: false,
-  exam: false,
-  treatment: false,
-  extra: false
+  ownOnly: true, // 自有药库
+  western: false, // 西药, 中成药
+  chinese: false, // 中药
+  exam: false, // 检验
+  treatment: false, // 处置
+  extra: false // 附加费
 });
 
 // 同步外部 modelValue
@@ -354,8 +406,8 @@ const filteredData = computed<MedicineItem[]>(() => {
     if (filters.western || filters.chinese) {
       list.push(
         ...allDrugs.value.filter(d => {
-          if (filters.western && d.category === "western") return true;
-          if (filters.chinese && d.category === "chinese") return true;
+          if (filters.western && [0, 1, 3].includes(d.type)) return true;
+          if (filters.chinese && d.type === 2) return true;
           return false;
         })
       );
@@ -365,14 +417,15 @@ const filteredData = computed<MedicineItem[]>(() => {
     if (filters.extra) list.push(...allExtraItems.value);
   }
 
-  // 关键字过滤（客户端）
+  // 关键字过滤（客户端，支持拼音首字母不区分大小写）
   const kw = keyword.value.trim().toLowerCase();
   if (kw) {
     list = list.filter(
       m =>
         m.name.toLowerCase().includes(kw) ||
         m.spec.toLowerCase().includes(kw) ||
-        m.manufacturer.toLowerCase().includes(kw)
+        m.manufacturer.toLowerCase().includes(kw) ||
+        (m.pinyin ?? "").toLowerCase().includes(kw)
     );
   }
 
@@ -459,6 +512,7 @@ function confirmActive() {
 
 // ---- Dropdown Controls ----
 function handleInputFocus() {
+  if (props.disabled) return;
   if (!visible.value) {
     openDropdown();
   }
@@ -468,6 +522,14 @@ function openDropdown() {
   visible.value = true;
   activeIndex.value = -1;
   shouldIgnoreClickOutside.value = true;
+  // 根据 filterType 设置默认过滤
+  if (props.filterType === "western") {
+    filters.western = true;
+    filters.chinese = false;
+  } else if (props.filterType === "chinese") {
+    filters.western = false;
+    filters.chinese = true;
+  }
   loadAllData();
   nextTick(() => {
     updateDropdownPosition();
@@ -480,9 +542,11 @@ function openDropdown() {
 function closeDropdown() {
   visible.value = false;
   activeIndex.value = -1;
+  keyword.value = "";
 }
 
 function handleTriggerClick(e: MouseEvent) {
+  if (props.disabled) return;
   if (e.target === inputRef.value) return;
   if (visible.value) {
     closeDropdown();
@@ -617,6 +681,16 @@ defineExpose({
   border-color: #409eff;
 }
 
+.ms-trigger--disabled {
+  background-color: #f5f7fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ms-trigger--disabled:hover {
+  border-color: #dcdfe6;
+}
+
 .ms-input {
   flex: 1;
   border: none;
@@ -631,6 +705,11 @@ defineExpose({
 
 .ms-input::placeholder {
   color: #c0c4cc;
+}
+
+.ms-input:disabled {
+  cursor: not-allowed;
+  background-color: #f5f7fa;
 }
 
 .ms-arrow {

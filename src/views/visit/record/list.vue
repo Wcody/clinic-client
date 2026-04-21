@@ -76,11 +76,12 @@ const formatAge = (row: BQVisitRecordEntityType) => {
 
 // ==================== 待诊患者 ====================
 const pendingColumns = ref<any>([
-  { label: "序号", prop: "index", minWidth: 80, slot: "index" },
+  { label: "序号", prop: "index", minWidth: 40, slot: "index" },
   { label: "姓名", prop: "patient", minWidth: 120 },
-  { label: "性别", prop: "gender", minWidth: 80 },
-  { label: "年龄", prop: "firstAge", minWidth: 100, slot: "pendingAge" },
+  { label: "性别", prop: "gender", minWidth: 40 },
+  { label: "年龄", prop: "firstAge", minWidth: 80, slot: "pendingAge" },
   { label: "挂号号", prop: "registrationNo", minWidth: 120 },
+  { label: "总金额", prop: "totalPrice", minWidth: 120 },
   { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "挂号时间", prop: "orderTime", minWidth: 160 },
@@ -109,7 +110,7 @@ const diagnosedColumns = ref<any>([
   { label: "姓名", prop: "patient", minWidth: 150 },
   { label: "性别", prop: "gender", minWidth: 100 },
   { label: "年龄", prop: "firstAge", minWidth: 120, slot: "diagnosedAge" },
-  { label: "挂号号", prop: "registrationNo", minWidth: 120 },
+  { label: "总金额", prop: "totalPrice", minWidth: 120 },
   { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "就诊时间", prop: "orderTime", minWidth: 180 },

@@ -223,6 +223,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <div>
   <div class="main">
     <el-form
       ref="queryFormRef"
@@ -374,6 +375,7 @@ onMounted(() => {
       <el-button @click="dialogVisible = false">取消</el-button>
     </template>
   </el-dialog>
+  </div>
 </template>
 
 <style scoped lang="scss">

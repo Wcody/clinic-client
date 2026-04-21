@@ -6,13 +6,17 @@ import { ReNormalCountTo } from "@/components/ReCountTo";
 import { useRenderFlicker } from "@/components/ReFlicker";
 import { ChartBar, ChartLine, ChartRound } from "./components/charts";
 import Segmented, { type OptionsType } from "@/components/ReSegmented";
+import GroupLine from "@iconify-icons/ri/group-line";
+import Question from "@iconify-icons/ri/question-answer-line";
+import CheckLine from "@iconify-icons/ri/chat-check-line";
 import {
-  chartData,
-  barChartData,
-  visitRankData,
-  feeRankData,
-  latestNewsData
-} from "./data";
+  getDashboardSummaryApi,
+  getMySummaryApi,
+  getVisitTrendApi,
+  getVisitRankApi,
+  getFeeRankApi,
+  getRecentEventsApi
+} from "@/api/home/dashboard";
 
 defineOptions({
   name: "Welcome"
@@ -23,7 +27,54 @@ const { isDark } = useDark();
 let curWeek = ref(1); // 0上周、1本周
 const optionsBasis: Array<OptionsType> = [{ label: "上周" }, { label: "本周" }];
 
-const chartDataRef = ref(chartData);
+const chartDataRef = ref([
+  {
+    icon: GroupLine,
+    bgColor: "#e6faf8",
+    color: "#2dd4bf",
+    duration: 2200,
+    name: "今日挂号总量",
+    value: 0,
+    percent: "",
+    data: [] as number[]
+  },
+  {
+    icon: Question,
+    bgColor: "#eff6ff",
+    color: "#38bdf8",
+    duration: 1600,
+    name: "待接诊人数",
+    value: 0,
+    percent: "实时更新",
+    data: [] as number[]
+  },
+  {
+    icon: CheckLine,
+    bgColor: "#eff8f4",
+    color: "#26ce83",
+    duration: 1500,
+    name: "今日收费总额(元)",
+    value: 0,
+    percent: "",
+    data: [] as number[]
+  }
+]);
+
+const barChartDataRef = ref([
+  { thisWeekData: [] as number[], lastWeekData: [] as number[] },
+  { thisWeekData: [] as number[], lastWeekData: [] as number[] }
+]);
+const daysDataRef = ref<string[]>([]);
+
+const visitRankDataRef = ref<Array<{ rank: number; doctor: string; department: string; count: number; trend: string }>>([]);
+const feeRankDataRef = ref<Array<{ rank: number; doctor: string; department: string; fee: number; trend: string }>>([]);
+const latestNewsDataRef = ref<Array<{ doctor: string; patient: string; department: string; eventDate: string }>>([]);
+
+const summaryData = ref({
+  myReceivedCount: 0,
+  myPendingCount: 0,
+  myTodayFee: 0
+});
 
 const today = new Date().toLocaleDateString("zh-CN", {
   year: "numeric",
@@ -32,11 +83,79 @@ const today = new Date().toLocaleDateString("zh-CN", {
   weekday: "long"
 });
 
-onMounted(() => {
-  setTimeout(() => {
-    chartDataRef.value[0].value = 47;
-    chartDataRef.value[0].data = [32, 41, 38, 45, 50, 39, 47];
-  }, 2000);
+const loading = ref(true);
+
+onMounted(async () => {
+  try {
+    const [summaryRes, mySummaryRes, trendRes, visitRankRes, feeRankRes, eventsRes] = await Promise.all([
+      getDashboardSummaryApi(),
+      getMySummaryApi(),
+      getVisitTrendApi(),
+      getVisitRankApi(),
+      getFeeRankApi(),
+      getRecentEventsApi()
+    ]);
+
+    const summary = summaryRes.data;
+    if (summary) {
+      chartDataRef.value[0].value = summary.todayRegistrationTotal || 0;
+      chartDataRef.value[0].percent = "";
+      chartDataRef.value[1].value = summary.myPendingCount || 0;
+      chartDataRef.value[2].value = summary.myTodayFee || 0;
+    }
+
+    const mySummary = mySummaryRes.data;
+    if (mySummary) {
+      summaryData.value = {
+        myReceivedCount: mySummary.myReceivedCount || 0,
+        myPendingCount: mySummary.myPendingCount || 0,
+        myTodayFee: mySummary.myTodayFee || 0
+      };
+    }
+
+    const trend = trendRes.data;
+    if (trend) {
+      daysDataRef.value = trend.days || [];
+      barChartDataRef.value = [
+        { thisWeekData: trend.thisWeek || [], lastWeekData: trend.lastWeek || [] },
+        { thisWeekData: trend.thisWeek || [], lastWeekData: trend.lastWeek || [] }
+      ];
+      chartDataRef.value[0].data = trend.thisWeek || [];
+      chartDataRef.value[1].data = trend.thisWeek || [];
+      chartDataRef.value[2].data = trend.thisWeek || [];
+    }
+
+    const visitRank = visitRankRes.data;
+    if (visitRank?.list) {
+      visitRankDataRef.value = visitRank.list.map((item: any) => ({
+        rank: item.rank,
+        doctor: item.doctor,
+        department: item.department,
+        count: item.count || 0,
+        trend: item.trend || "0"
+      }));
+    }
+
+    const feeRank = feeRankRes.data;
+    if (feeRank?.list) {
+      feeRankDataRef.value = feeRank.list.map((item: any) => ({
+        rank: item.rank,
+        doctor: item.doctor,
+        department: item.department,
+        fee: item.fee || 0,
+        trend: item.trend || "0%"
+      }));
+    }
+
+    const events = eventsRes.data;
+    if (events?.list) {
+      latestNewsDataRef.value = events.list;
+    }
+  } catch (error) {
+    console.error("Failed to load dashboard data:", error);
+  } finally {
+    loading.value = false;
+  }
 });
 </script>
 
@@ -62,17 +181,17 @@ onMounted(() => {
             <div class="banner-stats">
               <div class="banner-stats-row">
                 <div class="banner-stat-item">
-                  <span class="stat-num teal">47</span>
+                  <span class="stat-num teal">{{ summaryData.myReceivedCount }}</span>
                   <span class="stat-label">我的已接诊</span>
                 </div>
                 <div class="banner-stat-divider" />
                 <div class="banner-stat-item">
-                  <span class="stat-num blue">8</span>
+                  <span class="stat-num blue">{{ summaryData.myPendingCount }}</span>
                   <span class="stat-label">我的待接诊</span>
                 </div>
                 <div class="banner-stat-divider" />
                 <div class="banner-stat-item">
-                  <span class="stat-num green">3860</span>
+                  <span class="stat-num green">{{ summaryData.myTodayFee }}</span>
                   <span class="stat-label">我的收费(元)</span>
                 </div>
               </div>
@@ -164,8 +283,9 @@ onMounted(() => {
           </div>
           <div class="mt-3">
             <ChartBar
-              :thisWeekData="barChartData[curWeek].thisWeekData"
-              :lastWeekData="barChartData[curWeek].lastWeekData"
+              :thisWeekData="barChartDataRef[curWeek].thisWeekData"
+              :lastWeekData="barChartDataRef[curWeek].lastWeekData"
+              :daysData="daysDataRef"
             />
           </div>
         </el-card>
@@ -187,7 +307,7 @@ onMounted(() => {
           <el-scrollbar class="mt-3 news-scrollbar">
             <el-timeline>
               <el-timeline-item
-                v-for="(item, index) in latestNewsData"
+                v-for="(item, index) in latestNewsDataRef"
                 :key="index"
                 center
                 placement="top"
@@ -200,7 +320,7 @@ onMounted(() => {
                 "
                 :timestamp="item.eventDate"
               >
-                <p class="text-text_color_regular text-sm">
+              e<p class="text-text_color_regular text-sm">
                   {{
                     `${item.doctor} 接诊了 ${item.patient}（${item.department}）`
                   }}
@@ -226,7 +346,7 @@ onMounted(() => {
             <span class="text-sm text-text_color_regular">今日</span>
           </div>
           <el-table
-            :data="visitRankData"
+            :data="visitRankDataRef"
             :show-header="true"
             stripe
             size="small"
@@ -282,7 +402,7 @@ onMounted(() => {
             <span class="text-md font-medium">收费金额排行</span>
             <span class="text-sm text-text_color_regular">今日</span>
           </div>
-          <el-table :data="feeRankData" :show-header="true" stripe size="small">
+          <el-table :data="feeRankDataRef" :show-header="true" stripe size="small">
             <el-table-column label="排名" width="56" align="center">
               <template #default="{ row }">
                 <span

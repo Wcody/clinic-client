@@ -200,7 +200,7 @@ async function fetchDiagnoses(kw: string) {
     const res = kw
       ? await searchDiagnosisDictApi(kw)
       : await getDiagnosisDictListApi({
-          filters: [{ field: "status", operator: "eq", value: "true" }]
+          filters: [{ field: "status", operator: "eq", value: "1" }]
         });
     if (res?.data) {
       rawData.value = res.data as BQDiagnosisDictEntityType[];
@@ -300,6 +300,24 @@ function confirmActive() {
   if (!visible.value) return;
   if (activeIndex.value >= 0 && activeIndex.value < pagedData.value.length) {
     handleSelect(pagedData.value[activeIndex.value]);
+  } else if (keyword.value.trim().length > 0) {
+    // 没有匹配结果，回车返回当前输入框关键字组成的诊断数据
+    handleSelect({
+      diagnosisCode: "0",
+      diagnosisName: keyword.value.trim(),
+      pinyin: null,
+      status: true,
+      version: null,
+      deleted: null,
+      deletedTime: null,
+      deletedBy: null,
+      createdBy: null,
+      createdTime: null,
+      updatedBy: null,
+      updatedTime: null,
+      tenantId: null,
+      id: null
+    });
   }
 }
 

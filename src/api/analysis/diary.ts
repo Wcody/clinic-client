@@ -51,11 +51,11 @@ export const getDiaryListApi = (params: BQDiarySearchParams) => {
 };
 
 /**
- * 获取医生列表（clinic/staff/list）
+ * 获取医生列表（clinic/staff/listDoctors）
  */
 export const getDoctorListApi = () => {
   return http.request<BQResultType<{ list: { id: string; name: string }[] }>>(
     "get",
-    "/clinic/staff/list"
+    "/clinic/staff/listDoctors"
   );
 };

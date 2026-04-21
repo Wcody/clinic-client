@@ -139,21 +139,40 @@ export type BqPrescriptionEntityType = {
   prescNo?: string;
   /** 就诊记录ID */
   recordId?: number;
-  /** 挂号ID */
+  /** 挂号ID（可为空） */
   regId?: number;
   /** 患者ID */
   patientId?: number;
   /** 开方医生ID */
   doctorId?: number;
-  /** 处方类型：1西药 2中药 3检查 4处置 */
+  /** 处方类型:1西药 2中药 3检查 4处置 */
   prescType?: number;
   /** 组号 */
   groupNo?: string;
   /** 处方总价 */
   totalPrice?: number;
-  /** 状态：1已开 2已缴费 3已发药 4作废 */
+  /** 用法类型ID，中药处方才用 */
+  usageType?: number;
+  /** 频率ID，中药处方才用 */
+  frequence?: number;
+  /** 剂数，中药处方才用 */
+  doseAmount?: number;
+  /** 医嘱/嘱托，中药处方才用 */
+  recommendation?: string;
+  /** 天数 */
+  days?: number;
+  /** 状态:1已开 2已缴费 3已发药 4作废 */
   status?: number;
+  /** 行乐观锁 */
+  version?: number;
+  /** 逻辑删除标记:0未删除 1已删除 */
+  deleted?: boolean;
+  /** 删除时间 */
+  deletedTime?: string;
+  /** 删除人名称 */
+  deletedBy?: string;
   createdTime?: string;
+  updateTime?: string;
 };
 
 // ==================== 处方明细类型（对应 BqPrescriptionItemEntity，/ams/api/v1/prescription/item） ====================

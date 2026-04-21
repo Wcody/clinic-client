@@ -33,9 +33,9 @@ export type BQPrescriptionTemplateDetailEntityType = {
   singleUsageUnit?: number;
   /** 天数 */
   days?: number;
-  /** 煎煮类型ID */
+  /** 煎煮类型ID（中药） */
   cookingType?: number;
-  /** 组号 */
+  /** 组号（用于分组显示） */
   groupNo?: number;
   /** 排序 */
   sort?: number;
@@ -51,9 +51,9 @@ export type BQPrescriptionTemplateEntityType = {
   id?: number;
   /** 模板名称 */
   name?: string;
-  /** 处方类型 */
+  /** 处方类型，1西药，2中药 */
   prescriptionType?: number;
-  /** 模板类型 */
+  /** 模板类型，1是个人，2是诊所 */
   templateType?: number;
   /** 用法类型ID */
   usageType?: number;
@@ -61,8 +61,12 @@ export type BQPrescriptionTemplateEntityType = {
   frequence?: number;
   /** 剂数 */
   doseAmount?: number;
-  /** 医嘱/建议 */
+  /** 医嘱/嘱托 */
   recommendation?: string;
+  /** 天数 */
+  days?: number;
+  /** 处方详细描述 */
+  remark?: string;
   /** 操作人 */
   operator?: string;
   /** 操作时间 */
@@ -73,10 +77,14 @@ export type BQPrescriptionTemplateEntityType = {
   createTime?: string;
   /** 更新时间 */
   updateTime?: string;
-  /** 是否为目录 */
+  /** 是否为目录,0否，1是 */
   hasCategory?: boolean;
   /** 父级目录ID */
   parentId?: number | null;
+  /** 一级目录ID */
+  oneLevel?: number | null;
+  /** 二级目录ID */
+  twoLevel?: number | null;
   /** 明细列表（前端使用，后端不直接存储） */
   details?: BQPrescriptionTemplateDetailEntityType[];
 } & BQBaseEntityType;
@@ -91,8 +99,8 @@ export const getPrescriptionTemplateEntityDefault: (
 ) => {
   return {
     name: row?.name ?? "",
-    prescriptionType: row?.prescriptionType ?? true,
-    templateType: row?.templateType ?? true,
+    prescriptionType: row?.prescriptionType ?? 2,
+    templateType: row?.templateType ?? 1,
     usageType: row?.usageType ?? undefined,
     frequence: row?.frequence ?? undefined,
     doseAmount: row?.doseAmount ?? 1,
@@ -102,6 +110,8 @@ export const getPrescriptionTemplateEntityDefault: (
     status: row?.status ?? true,
     hasCategory: row?.hasCategory ?? false,
     parentId: row?.parentId ?? null,
+    oneLevel: row?.oneLevel ?? null,
+    twoLevel: row?.twoLevel ?? null,
     details: row?.details ?? [],
 
     ...getBaseEntityDefault(row)

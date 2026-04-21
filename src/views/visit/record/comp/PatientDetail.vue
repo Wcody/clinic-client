@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, watch } from "vue";
+import { ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { Search } from "@element-plus/icons-vue";
-import {
-  getPatientByIdApi,
-  updatePatientApi,
-  type BQPatientEntityType
-} from "@/api/cm/patient";
+import BqPatientBasicInfo from "@/components/BqPatientBasicInfo/src/BqPatientBasicInfo.vue";
+import { getPatientByIdApi, updatePatientApi } from "@/api/cm/patient";
 import {
   getMedicalRecordListApi,
   getMedicalRecordByIdApi,
@@ -27,75 +24,10 @@ const emit = defineEmits<{
 }>();
 
 const activeTab = ref("basic");
+const basicInfoRef = ref<InstanceType<typeof BqPatientBasicInfo>>();
 
 // ==================== 基本信息 ====================
 const patientId = ref<number>(0);
-
-const basicForm = reactive<Partial<BQPatientEntityType>>({
-  name: "",
-  gender: "男",
-  mobile: "",
-  idCard: "",
-  archiveNo: "",
-  province: undefined,
-  city: undefined,
-  district: undefined,
-  address: "",
-  isAllergy: false,
-  allergicHistory: ""
-});
-
-// UI-only age fields (compose to/from entity age string + firstAge/lastAge/ageType)
-const ageYears = ref(0);
-const ageMonths = ref(0);
-const ageUnit = ref("岁");
-
-const ageUnitOptions = [
-  { label: "岁", value: "岁" },
-  { label: "月", value: "月" },
-  { label: "天", value: "天" }
-];
-
-const ageUnitToType = (unit: string) =>
-  unit === "岁" ? 1 : unit === "月" ? 2 : 3;
-
-const parseAge = (age: string | undefined) => {
-  if (!age) return;
-  const matchYear = age.match(/^(\d+)岁(\d+)?月?/);
-  if (matchYear) {
-    ageYears.value = parseInt(matchYear[1]);
-    ageMonths.value = matchYear[2] ? parseInt(matchYear[2]) : 0;
-    ageUnit.value = "岁";
-    return;
-  }
-  const matchMonth = age.match(/^(\d+)月(\d+)?天?/);
-  if (matchMonth) {
-    ageYears.value = parseInt(matchMonth[1]);
-    ageMonths.value = matchMonth[2] ? parseInt(matchMonth[2]) : 0;
-    ageUnit.value = "月";
-    return;
-  }
-  const matchDay = age.match(/^(\d+)天/);
-  if (matchDay) {
-    ageYears.value = parseInt(matchDay[1]);
-    ageMonths.value = 0;
-    ageUnit.value = "天";
-  }
-};
-
-const composeAge = (): string => {
-  if (ageUnit.value === "岁") {
-    return ageMonths.value > 0
-      ? `${ageYears.value}岁${ageMonths.value}月`
-      : `${ageYears.value}岁`;
-  }
-  if (ageUnit.value === "月") {
-    return ageMonths.value > 0
-      ? `${ageYears.value}月${ageMonths.value}天`
-      : `${ageYears.value}月`;
-  }
-  return `${ageYears.value}天`;
-};
 
 const loadPatient = async (id: number) => {
   if (!id) return;
@@ -103,21 +35,8 @@ const loadPatient = async (id: number) => {
   try {
     const res = await getPatientByIdApi(id);
     if (res.code === 0 && res.data) {
-      const p = res.data as BQPatientEntityType;
-      basicForm.name = p.name ?? "";
-      basicForm.gender = p.gender ?? "男";
-      basicForm.mobile = p.mobile ?? "";
-      basicForm.idCard = p.idCard ?? "";
-      basicForm.archiveNo = p.archiveNo ?? "";
-      basicForm.province = p.province;
-      basicForm.city = p.city;
-      basicForm.district = p.district;
-      basicForm.address = p.address ?? "";
-      basicForm.isAllergy = p.isAllergy ?? false;
-      basicForm.allergicHistory = p.allergicHistory ?? "";
-      (basicForm as any).id = p.id;
-      (basicForm as any).version = p.version;
-      parseAge(p.age);
+      // 使用 BqPatientBasicInfo 组件的 selectPatient 方法填充数据
+      basicInfoRef.value?.selectPatient(res.data);
     }
   } catch (e: any) {
     ElMessage.error(e?.message || "加载患者信息失败");
@@ -133,16 +52,9 @@ watch(
   { immediate: true }
 );
 
-const handleModify = async () => {
+const handleBasicSave = async (val: any) => {
   try {
-    const data: Partial<BQPatientEntityType> & Record<string, any> = {
-      ...basicForm,
-      age: composeAge(),
-      firstAge: ageYears.value,
-      lastAge: ageUnit.value === "天" ? 0 : ageMonths.value,
-      ageType: ageUnitToType(ageUnit.value)
-    };
-    const res = await updatePatientApi(data);
+    const res = await updatePatientApi(val);
     if (res.code === 0) {
       ElMessage.success("修改成功");
     } else {
@@ -239,86 +151,11 @@ const handleBack = () => {
       <!-- 基本信息 -->
       <el-tab-pane label="基本信息" name="basic">
         <div class="basic-content">
-          <div class="patient-code">档案编号：{{ basicForm.archiveNo }}</div>
-
-          <el-form label-width="90px" class="basic-form">
-            <!-- 行1: 姓名 性别 年龄 -->
-            <div class="form-row">
-              <el-form-item label="* 姓名">
-                <el-input v-model="basicForm.name" class="field-input" />
-              </el-form-item>
-              <el-form-item label="* 性别">
-                <el-radio-group v-model="basicForm.gender">
-                  <el-radio value="男">男</el-radio>
-                  <el-radio value="女">女</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item label="* 年龄" class="age-item">
-                <el-input
-                  v-model.number="ageYears"
-                  class="age-year-input"
-                />
-                <el-select v-model="ageUnit" class="age-unit-select">
-                  <el-option
-                    v-for="item in ageUnitOptions"
-                    :key="item.value"
-                    :label="item.label"
-                    :value="item.value"
-                  />
-                </el-select>
-                <el-input
-                  v-model.number="ageMonths"
-                  class="age-month-input"
-                />
-                <span class="age-month-label">月</span>
-              </el-form-item>
-            </div>
-
-            <!-- 行2: 手机号 身份证 档案号 -->
-            <div class="form-row">
-              <el-form-item label="手机号">
-                <el-input v-model="basicForm.mobile" class="field-input" />
-              </el-form-item>
-              <el-form-item label="身份证">
-                <el-input v-model="basicForm.idCard" class="field-input" />
-              </el-form-item>
-              <el-form-item label="档案号">
-                <el-input v-model="basicForm.archiveNo" class="field-input" />
-              </el-form-item>
-            </div>
-
-            <!-- 行3: 地址 -->
-            <div class="form-row">
-              <el-form-item label="详细地址" class="address-full-item">
-                <el-input
-                  v-model="basicForm.address"
-                  class="address-detail-input"
-                />
-              </el-form-item>
-            </div>
-
-            <!-- 行4: 过敏史 -->
-            <div class="form-row">
-              <el-form-item label="过敏史">
-                <el-radio-group v-model="basicForm.isAllergy">
-                  <el-radio :value="true">是</el-radio>
-                  <el-radio :value="false">否</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item v-if="basicForm.isAllergy" label="过敏药物">
-                <el-input
-                  v-model="basicForm.allergicHistory"
-                  class="field-input"
-                  placeholder="请填写过敏药物"
-                />
-              </el-form-item>
-            </div>
-
-            <!-- 修改按钮 -->
-            <div class="form-actions">
-              <el-button type="primary" @click="handleModify">修改</el-button>
-            </div>
-          </el-form>
+          <BqPatientBasicInfo
+            ref="basicInfoRef"
+            :show-allergy="true"
+            @save="handleBasicSave"
+          />
         </div>
       </el-tab-pane>
 
@@ -502,75 +339,6 @@ const handleBack = () => {
 // ========== 基本信息 ==========
 .basic-content {
   padding: 16px 20px;
-
-  .patient-code {
-    font-size: 13px;
-    color: #1890ff;
-    margin-bottom: 16px;
-  }
-
-  .basic-form {
-    .form-row {
-      display: flex;
-      align-items: flex-start;
-      margin-bottom: 4px;
-      flex-wrap: wrap;
-
-      :deep(.el-form-item) {
-        margin-bottom: 12px;
-        margin-right: 20px;
-      }
-    }
-
-    .field-input {
-      width: 180px;
-    }
-
-    .age-item {
-      :deep(.el-form-item__content) {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .age-year-input {
-        width: 60px;
-      }
-
-      .age-unit-select {
-        width: 70px;
-      }
-
-      .age-month-input {
-        width: 50px;
-      }
-
-      .age-month-label {
-        font-size: 13px;
-        color: #606266;
-        white-space: nowrap;
-      }
-    }
-
-    .address-full-item {
-      :deep(.el-form-item__content) {
-        display: flex;
-        align-items: center;
-      }
-
-      .address-detail-input {
-        width: 380px;
-      }
-    }
-
-    .form-actions {
-      display: flex;
-      justify-content: center;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #e4e7ed;
-    }
-  }
 }
 
 // ========== 就诊信息 ==========

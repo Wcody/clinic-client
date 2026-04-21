@@ -32,6 +32,9 @@ import {
 } from "@/api/visit/patient";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import Refresh from "@iconify-icons/ep/refresh";
+import { lo } from "element-plus/es/locale/index.mjs";
+
+const localUser = useUserStoreHook();
 
 // 标签页状态
 const activeTab = ref("new");
@@ -104,7 +107,7 @@ const registrationForm = reactive({
   phone: "", // 手机号
   contact: "", // 联系方式
   department: "", // 科室（从API加载后设置默认值）
-  doctor: "", // 医生（从API加载后设置默认值）
+  doctor: localUser.eid, // 医生（从API加载后设置默认值）
   item: "", // 项目（从API加载后设置默认值）
   receivable: 0, // 应收费用（与默认项目同步）
   actual: 0, // 实收
@@ -341,6 +344,7 @@ const handleRegistration = async () => {
     const res = await saveVisitPatientApi(patientBasicInfoRef.value.form);
     if (res.code == 0) {
       handlePatientChange(res.data);
+      patientId = res.data.id;
     } else {
       ElMessage.error("创建患者失败，请重试");
       return;

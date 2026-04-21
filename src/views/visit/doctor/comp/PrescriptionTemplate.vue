@@ -7,6 +7,11 @@ import {
   type BQPrescriptionTemplateEntityType,
   type BQPrescriptionTemplateDetailEntityType
 } from "@/api/cm/prescriptionTemplate";
+import {
+  getMedicalDictionaryListApi,
+  type BQMedicalDictionaryEntityType
+} from "@/api/cm/medicalDictionary";
+import { BQSearchFilter } from "@/api/api";
 import { ElMessage } from "element-plus";
 
 const props = defineProps<{
@@ -14,7 +19,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  confirm: [items: BQPrescriptionTemplateDetailEntityType[]];
+  confirm: [details: BQPrescriptionTemplateDetailEntityType[], templateInfo: BQPrescriptionTemplateEntityType];
 }>();
 
 const visible = ref(false);
@@ -23,6 +28,9 @@ const searchName = ref("");
 const selectedIndex = ref(0);
 const list = ref<BQPrescriptionTemplateEntityType[]>([]);
 const drugList = ref<BQPrescriptionTemplateDetailEntityType[]>([]);
+const currentTemplate = ref<BQPrescriptionTemplateEntityType | null>(null);
+const usageOptions = ref<BQMedicalDictionaryEntityType[]>([]);
+const frequencyOptions = ref<BQMedicalDictionaryEntityType[]>([]);
 
 const filteredList = computed(() => {
   let result = list.value;
@@ -44,12 +52,51 @@ const handleSelectTemplate = async (idx: number) => {
   selectedIndex.value = idx;
   const tpl = filteredList.value[idx];
   if (!tpl?.id) return;
+  currentTemplate.value = tpl;
   try {
     const res = await getPrescriptionTemplateDetailByTemplateIdApi(String(tpl.id));
     drugList.value = (res?.data as BQPrescriptionTemplateDetailEntityType[]) || [];
   } catch {
     drugList.value = [];
   }
+};
+
+const loadUsageDictionary = async () => {
+  try {
+    const res = await getMedicalDictionaryListApi({
+      filters: [new BQSearchFilter("dictType", "eq", "1")]
+    });
+    if (res?.data) {
+      usageOptions.value = (res.data as BQMedicalDictionaryEntityType[]).filter(
+        (item: any) => item.status !== false
+      );
+    }
+  } catch {}
+};
+
+const loadFrequencyDictionary = async () => {
+  try {
+    const res = await getMedicalDictionaryListApi({
+      filters: [new BQSearchFilter("dictType", "eq", "2")]
+    });
+    if (res?.data) {
+      frequencyOptions.value = (res.data as BQMedicalDictionaryEntityType[]).filter(
+        (item: any) => item.status !== false
+      );
+    }
+  } catch {}
+};
+
+const getUsageName = (id?: number) => {
+  if (id == null) return '';
+  const item = usageOptions.value.find(o => o.id === id);
+  return item?.name ?? String(id);
+};
+
+const getFrequencyName = (id?: number) => {
+  if (id == null) return '';
+  const item = frequencyOptions.value.find(o => o.id === id);
+  return item?.name ?? String(id);
 };
 
 const load = async () => {
@@ -70,8 +117,9 @@ const load = async () => {
 
 const handleConfirm = () => {
   const tpl = filteredList.value[selectedIndex.value];
+  console.log("handleConfirm called, tpl:", tpl, "drugList:", drugList.value);
   if (!tpl) return;
-  emit("confirm", drugList.value);
+  emit("confirm", drugList.value, tpl);
   visible.value = false;
   ElMessage.success("已调用处方模板");
 };
@@ -79,10 +127,13 @@ const handleConfirm = () => {
 const open = () => {
   list.value = [];
   drugList.value = [];
+  currentTemplate.value = null;
   searchName.value = "";
   selectedIndex.value = 0;
   visible.value = true;
   load();
+  loadUsageDictionary();
+  loadFrequencyDictionary();
 };
 
 defineExpose({ open });
@@ -128,6 +179,30 @@ defineExpose({ open });
         </div>
       </div>
       <div class="tpl-detail">
+        <div class="detail-header">
+          <span class="detail-label">处方模板信息：</span>
+          <div v-if="!currentTemplate" class="empty-text">请选择模板</div>
+          <table v-else class="info-table">
+            <tr>
+              <th>模板名称</th>
+              <td>{{ currentTemplate.name || '' }}</td>
+              <th>处方类型</th>
+              <td>{{ currentTemplate.prescriptionType === 1 ? '西/成药' : currentTemplate.prescriptionType === 2 ? '中药' : currentTemplate.prescriptionType === 3 ? '检查检验' : currentTemplate.prescriptionType === 4 ? '处置项目' : '' }}</td>
+            </tr>
+            <tr>
+              <th>用法</th>
+              <td>{{ getUsageName(currentTemplate.usageType) }}</td>
+              <th>频率</th>
+              <td>{{ getFrequencyName(currentTemplate.frequence) }}</td>
+            </tr>
+            <tr>
+              <th>剂数</th>
+              <td>{{ currentTemplate.doseAmount || '' }}</td>
+              <th>建议/医嘱</th>
+              <td>{{ currentTemplate.recommendation || '' }}</td>
+            </tr>
+          </table>
+        </div>
         <div class="detail-drugs">
           <span class="detail-label">处方用药：</span>
           <div v-if="!drugList.length" class="empty-text">请选择模板</div>
@@ -250,9 +325,14 @@ defineExpose({ open });
   overflow-y: auto;
   padding: 16px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.detail-drugs {
+.detail-header {
+  flex-shrink: 0;
+
   .detail-label {
     font-size: 13px;
     color: #606266;
@@ -261,7 +341,48 @@ defineExpose({ open });
   }
 }
 
+.detail-drugs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+
+  .detail-label {
+    font-size: 13px;
+    color: #606266;
+    display: block;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+}
+
 .drug-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  flex: 1;
+  min-height: 0;
+
+  th,
+  td {
+    border: 1px solid #ebeef5;
+    padding: 6px 10px;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f7fa;
+    color: #606266;
+    font-weight: 500;
+    width: 100px;
+  }
+
+  td {
+    color: #303133;
+  }
+}
+
+.info-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
@@ -277,10 +398,12 @@ defineExpose({ open });
     background: #f5f7fa;
     color: #606266;
     font-weight: 500;
+    width: 100px;
   }
 
   td {
     color: #303133;
+    width: auto;
   }
 }
 

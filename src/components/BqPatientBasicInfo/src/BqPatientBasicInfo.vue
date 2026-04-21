@@ -94,6 +94,30 @@
           />
           <span class="unit-text">{{ form.ageType === 1 ? "月" : "天" }}</span>
         </div>
+        <div class="form-field">
+          <label class="field-label">身高</label>
+          <el-input
+            v-model.number="form.height"
+            class="vital-input"
+            type="number"
+            min="0"
+            step="0.01"
+            :disabled="isLocked"
+          />
+          <span class="unit-text">cm</span>
+        </div>
+        <div class="form-field">
+          <label class="field-label">体重</label>
+          <el-input
+            v-model.number="form.weight"
+            class="vital-input"
+            type="number"
+            min="0"
+            step="0.01"
+            :disabled="isLocked"
+          />
+          <span class="unit-text">kg</span>
+        </div>
       </div>
 
       <!-- 身份证 + 联系方式 -->
@@ -107,7 +131,7 @@
           />
         </div>
         <div class="form-field">
-          <label class="field-label">联系方式</label>
+          <label class="field-label">电话号码</label>
           <el-input
             v-model="form.mobile"
             class="phone-input"
@@ -182,13 +206,13 @@
       </div>
 
       <!-- 过敏史备注文本框 -->
-      <div v-if="showAllergy" class="form-row allergy-textarea-row">
+      <div v-if="showAllergy && form.isAllergy" class="form-row allergy-textarea-row">
         <el-input
           v-model="form.allergicHistory"
           type="textarea"
           :rows="2"
           class="allergy-textarea"
-          :disabled="isLocked || !form.isAllergy"
+          :disabled="isLocked"
         />
       </div>
     </div>
@@ -221,6 +245,8 @@ const emit = defineEmits<{
   (e: "update:modelValue", val: FormData): void;
   (e: "userSelect", user: any): void;
   (e: "save", val: FormData): void;
+  (e: "beforePatientSelect", user: any): void;
+  (e: "reset"): void;
 }>();
 
 // ---- 表单数据（字段与后端 BqPatientEntity 对齐）----
@@ -238,6 +264,8 @@ interface FormData {
   city: number | null; // 城市ID
   district: number | null; // 区县ID
   address: string; // 详细地址
+  height: number | null; // 身高（cm）
+  weight: number | null; // 体重（kg）
   isAllergy: boolean; // 是否过敏
   allergicHistory: string; // 过敏史
 }
@@ -256,6 +284,8 @@ const defaultForm = (): FormData => ({
   city: null,
   district: null,
   address: "",
+  height: null,
+  weight: null,
   isAllergy: false,
   allergicHistory: ""
 });
@@ -289,6 +319,7 @@ function handleReset() {
   snapshot = null;
   cityList.value = [];
   districtList.value = [];
+  emit("reset");
 }
 
 function handleEdit() {
@@ -340,6 +371,10 @@ function clearValidate() {
 
 // ---- 选中用户后自动填充并锁定 ----
 function onUserSelect(user: any) {
+  emit("beforePatientSelect", user);
+}
+
+function confirmPatientSelect(user: any) {
   form.value.id = user.id ?? user.patientId ?? undefined;
   form.value.name = user.name ?? "";
   form.value.gender = user.gender === "女" ? "女" : "男";
@@ -359,6 +394,8 @@ function onUserSelect(user: any) {
   form.value.mobile = user.mobile ?? user.phone ?? "";
   form.value.idCard = user.idCard ?? "";
   form.value.isFirstVisit = user.isFirstVisit ?? true;
+  form.value.height = user.height != null ? Number(user.height) : null;
+  form.value.weight = user.weight != null ? Number(user.weight) : null;
   form.value.isAllergy = user.isAllergy ?? false;
   form.value.allergicHistory = user.allergicHistory ?? "";
   form.value.address = user.address ?? "";
@@ -425,6 +462,35 @@ onMounted(async () => {
 
 // 根据患者实体对象直接填充表单并锁定（用于路由跳转时回填）
 function selectPatient(patient: any) {
+  applyPatientData(patient);
+  mode.value = "locked";
+  if (props.collapseOnSelect) collapsed.value = true;
+  emit("userSelect", patient);
+}
+
+// 仅填充数据，不锁定，用于需要确认的场景
+const pendingPatient = ref<any>(null);
+
+function preparePatient(patient: any) {
+  pendingPatient.value = patient;
+  emit("beforePatientSelect", patient);
+}
+
+function confirmPatient() {
+  if (pendingPatient.value) {
+    applyPatientData(pendingPatient.value);
+    mode.value = "locked";
+    if (props.collapseOnSelect) collapsed.value = true;
+    emit("userSelect", pendingPatient.value);
+    pendingPatient.value = null;
+  }
+}
+
+function cancelPatient() {
+  pendingPatient.value = null;
+}
+
+function applyPatientData(patient: any) {
   form.value.id = patient.id ?? undefined;
   form.value.name = patient.name ?? "";
   form.value.gender = patient.gender === "女" ? "女" : "男";
@@ -433,6 +499,8 @@ function selectPatient(patient: any) {
   form.value.lastAge = patient.lastAge ?? 0;
   form.value.idCard = patient.idCard ?? "";
   form.value.mobile = patient.mobile ?? "";
+  form.value.height = patient.height != null ? Number(patient.height) : null;
+  form.value.weight = patient.weight != null ? Number(patient.weight) : null;
   form.value.isAllergy = patient.isAllergy ?? false;
   form.value.allergicHistory = patient.allergicHistory ?? "";
   form.value.address = patient.address ?? "";
@@ -447,9 +515,6 @@ function selectPatient(patient: any) {
       }
     });
   }
-  mode.value = "locked";
-  if (props.collapseOnSelect) collapsed.value = true;
-  emit("userSelect", patient);
 }
 
 defineExpose({
@@ -458,7 +523,8 @@ defineExpose({
   clearValidate,
   formRef,
   reset: handleReset,
-  selectPatient
+  selectPatient,
+  confirmPatientSelect
 });
 </script>
 
@@ -583,6 +649,10 @@ defineExpose({
   color: #606266;
 }
 
+.vital-input {
+  width: 90px;
+}
+
 .medium-input {
   width: 200px;
 }
@@ -621,7 +691,7 @@ defineExpose({
 }
 
 .allergy-textarea {
-  width: 400px;
+  width: 100%;
 }
 
 :deep(.el-radio) {

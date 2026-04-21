@@ -30,7 +30,16 @@
       "Read(//d/d/Wcke/000SourceCode/IDEAProjects/**)",
       "Bash(npx vue-tsc *)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
-      "Read(//d/Wcke/000SourceCode/**)"
+      "Read(//d/Wcke/000SourceCode/**)",
+      "Bash(npx prettier *)",
+      "Bash(code \"d:\\\\Wcke\\\\000SourceCode\\\\IDEAProjects\\\\Clinic-Client\\\\src\\\\components\\\\BqMedicineSelector\\\\src\\\\MedicineSelector.vue\")",
+      "Bash(code -r \"d:\\\\Wcke\\\\000SourceCode\\\\IDEAProjects\\\\Clinic-Client\\\\src\\\\components\\\\BqMedicineSelector\\\\src\\\\MedicineSelector.vue\")",
+      "Bash(code -g \"d:\\\\Wcke\\\\000SourceCode\\\\IDEAProjects\\\\Clinic-Client\\\\src\\\\components\\\\BqMedicineSelector\\\\src\\\\MedicineSelector.vue:1\")",
+      "Bash(code \"d:/Wcke/000SourceCode/IDEAProjects/Clinic-Client/src/components/BqMedicineSelector/src/MedicineSelector.vue\")",
+      "Bash(where code *)",
+      "Bash(\"/c/Users/Wcke/AppData/Local/Programs/Microsoft VS Code/code\" \"d:/Wcke/000SourceCode/IDEAProjects/Clinic-Client/src/components/BqMedicineSelector/src/MedicineSelector.vue\")",
+      "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
+      "Bash(git checkout *)"
     ],
     "additionalDirectories": [
       "d:\\Wcke\\000SourceCode\\IDEAProjects\\Clinic-Client\\src\\views\\visit\\doctor",

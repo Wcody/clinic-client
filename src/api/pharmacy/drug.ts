@@ -26,9 +26,25 @@ export type BQDrugEntityType = {
   productionDate?: string;
   productionBatchNumber?: string;
   expireDate?: string;
-  status?: string;
+  pinyin?: string;
+  status?: boolean;
   source?: string; // 来源（前端扩展字段）
-  category?: string; // 分类（前端扩展字段：inspection/treatment/extra）
+  wholesaleUnit?: string;
+  wholesalePrice?: string;
+  conversionValue?: string;
+  prescriptionUnit?: string;
+  singleDosage?: string;
+  unitId?: number;
+  useWay?: string;
+  frequency?: string;
+  minStock?: string;
+  initialStockUnitId?: string;
+  approvalNumber?: string;
+  barcode?: string;
+  customCode?: string;
+  defaultSaleType?: number; // 0整卖 1散卖
+  decoWay?: string;
+  id?: number;
 } & BQBaseEntityType;
 
 /**
@@ -51,7 +67,7 @@ export const getDrugEntityDefault: (
     productionDate: row?.productionDate ?? "",
     productionBatchNumber: row?.productionBatchNumber ?? "",
     expireDate: row?.expireDate ?? "",
-    status: row?.status ?? "启用",
+    status: row?.status ?? true,
     source: row?.source ?? "",
     category: row?.category ?? "",
     ...getBaseEntityDefault(row)
@@ -101,7 +117,7 @@ export const updateDrugApi = (data?: object) => {
 export const getDrugListApi = (data?: object) => {
   const params = {
     ...data,
-    orders: [new BQSearchOrder("name")]
+    orders: [new BQSearchOrder("updatedTime", false)]
   };
   return http.request<BQDrugSearchListResultType>("get", "/drug/list", {
     params
@@ -132,4 +148,15 @@ export const deleteDrugApi = (eid: string) => {
  */
 export const deleteLogicDrugApi = (eid: string) => {
   return http.request<Boolean>("get", `/drug/deleteLogic/${eid}`);
+};
+
+/**
+ * 根据IDs批量查询药品API
+ */
+export const getDrugsByIdsApi = (ids: number[]) => {
+  return http.request<BQResultType<BQDrugEntityType[]>>(
+    "get",
+    "/drug/listByIds",
+    { params: { ids: ids.join(",") } }
+  );
 };
