@@ -2,7 +2,7 @@
 import { ref, watch } from "vue";
 import { Document } from "@element-plus/icons-vue";
 import {
-  getPrescriptionListByPatientIdApi,
+  getPrescriptionListWithDiagnosisByPatientIdApi,
   getPrescriptionItemListByPrescIdApi,
   type BqPrescriptionEntityType,
   type BqPrescriptionItemEntityType
@@ -18,6 +18,7 @@ const list = ref<BqPrescriptionEntityType[]>([]);
 const selectedIndex = ref(0);
 const itemsLoading = ref(false);
 const items = ref<BqPrescriptionItemEntityType[]>([]);
+const importDiagnosis = ref(false);
 
 const prescTypeLabel = (type?: number) => {
   const map: Record<number, string> = {
@@ -62,7 +63,7 @@ const load = async () => {
   items.value = [];
   selectedIndex.value = 0;
   try {
-    const res = await getPrescriptionListByPatientIdApi(props.patientId);
+    const res = await getPrescriptionListWithDiagnosisByPatientIdApi(props.patientId);
     list.value = (res?.data as any)?.records ?? res?.data ?? [];
     if (list.value.length > 0 && list.value[0].id) {
       loadItems(list.value[0].id);
@@ -72,9 +73,20 @@ const load = async () => {
   }
 };
 
-const open = () => {
+const open = async () => {
   visible.value = true;
   load();
+};
+
+const emit = defineEmits<{
+  confirm: [prescription: BqPrescriptionEntityType, items: BqPrescriptionItemEntityType[], importDiagnosis: boolean];
+}>();
+
+const handleImport = () => {
+  if (list.value.length > 0 && list.value[selectedIndex.value]) {
+    emit("confirm", list.value[selectedIndex.value], items.value, importDiagnosis.value);
+    visible.value = false;
+  }
 };
 
 defineExpose({ open });
@@ -135,6 +147,12 @@ defineExpose({ open });
               ¥{{ (list[selectedIndex].totalPrice ?? 0).toFixed(2) }}
             </span>
           </div>
+          <div class="detail-row">
+            <span class="detail-label">诊断</span>
+            <span class="detail-value diagnosis-red">
+              {{ list[selectedIndex]?.diagnosis || '—' }}
+            </span>
+          </div>
           <div style="margin-top: 12px">
             <div
               v-if="itemsLoading"
@@ -182,25 +200,56 @@ defineExpose({ open });
         </template>
       </div>
     </div>
+    <template #footer>
+      <div style="display: flex; width: 100%; justify-content: space-between; align-items: center">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <el-switch v-model="importDiagnosis" inline-prompt />
+          <span :style="{ fontSize: '16px', fontWeight: 'bold', marginLeft: '8px', color: importDiagnosis ? '#409eff' : '#c0c4cc' }">
+            {{ importDiagnosis ? '同时导入诊断信息' : '不导入诊断信息' }}
+          </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <el-button @click="visible = false">取消</el-button>
+          <el-button type="primary" :disabled="list.length === 0" @click="handleImport">
+            导入当前处方
+          </el-button>
+        </div>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
 <style scoped lang="scss">
 .history-prescription-dialog {
   :deep(.el-dialog) {
-    width: auto;
+    --el-dialog-width: 80vw;
+    width: var(--el-dialog-width);
+    height: 70vh;
     max-width: none;
   }
 
   :deep(.el-dialog__body) {
     padding: 0;
+    height: 70vh;
+    min-height: 70vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__footer) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
 .dialog-body {
   display: flex;
-  min-height: 50vh;
-  max-height: 50vh;
+  flex: 1;
+  min-height: 0;
+  height: 70vh;
+  overflow: hidden;
 }
 
 .presc-list {
@@ -276,8 +325,14 @@ defineExpose({ open });
   .detail-value {
     flex: 1;
     color: #303133;
+    word-break: break-all;
 
     &.price-red {
+      color: #f56c6c;
+      font-weight: 500;
+    }
+
+    &.diagnosis-red {
       color: #f56c6c;
       font-weight: 500;
     }

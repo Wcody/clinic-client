@@ -36,8 +36,8 @@
         :style="dropdownStyle"
         @mousedown.stop
       >
-        <!-- 过滤复选框 -->
-        <div class="ms-filters">
+        <!-- 过滤复选框 + 关闭按钮 -->
+        <div class="ms-filters" @mousedown.stop="startDrag">
           <el-checkbox v-model="filters.ownOnly" @change="handleFilterChange">
             仅显示自有药品
           </el-checkbox>
@@ -68,6 +68,11 @@
           >
             附加费
           </el-checkbox>
+          <div class="ms-filters-right">
+            <el-icon class="ms-dropdown-close" @click.stop="closeDropdown">
+              <Close />
+            </el-icon>
+          </div>
         </div>
 
         <!-- 结果表格 -->
@@ -168,7 +173,7 @@ import {
   onUnmounted,
   nextTick
 } from "vue";
-import { ArrowDown } from "@element-plus/icons-vue";
+import { ArrowDown, Close } from "@element-plus/icons-vue";
 import { getDrugListApi } from "@/api/pharmacy/drug";
 import { getExamineItemListApi } from "@/api/pharmacy/examine";
 import { getTreatmentItemListApi } from "@/api/pharmacy/treatment";
@@ -242,6 +247,12 @@ const jumpInput = ref<number>(1);
 const dropdownStyle = ref<Record<string, string>>({});
 const activeIndex = ref(-1);
 const shouldIgnoreClickOutside = ref(false);
+
+// ---- 拖拽状态 ----
+const isDragging = ref(false);
+const dragOffset = ref({ x: 0, y: 0 });
+// 保存用户拖动后的位置
+const customPosition = ref<{ top: number; left: number } | null>(null);
 
 // ---- 数据层 ----
 const loading = ref(false);
@@ -470,6 +481,15 @@ const visiblePages = computed<number[]>(() => {
 // ---- Positioning ----
 function updateDropdownPosition() {
   if (!selectorRef.value) return;
+  // 如果有自定义位置，使用自定义位置
+  if (customPosition.value) {
+    dropdownStyle.value = {
+      ...dropdownStyle.value,
+      left: `${customPosition.value.left}px`,
+      top: `${customPosition.value.top}px`
+    };
+    return;
+  }
   const rect = selectorRef.value.getBoundingClientRect();
   dropdownStyle.value = {
     position: "fixed",
@@ -522,6 +542,8 @@ function openDropdown() {
   visible.value = true;
   activeIndex.value = -1;
   shouldIgnoreClickOutside.value = true;
+  // 恢复原始位置
+  customPosition.value = null;
   // 根据 filterType 设置默认过滤
   if (props.filterType === "western") {
     filters.western = true;
@@ -543,6 +565,37 @@ function closeDropdown() {
   visible.value = false;
   activeIndex.value = -1;
   keyword.value = "";
+}
+
+// ---- 拖拽功能 ----
+function startDrag(e: MouseEvent) {
+  if (!dropdownRef.value) return;
+  isDragging.value = true;
+  const rect = dropdownRef.value.getBoundingClientRect();
+  dragOffset.value = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+  document.addEventListener("mousemove", onDrag);
+  document.addEventListener("mouseup", stopDrag);
+}
+
+function onDrag(e: MouseEvent) {
+  if (!isDragging.value || !dropdownRef.value) return;
+  const newLeft = e.clientX - dragOffset.value.x;
+  const newTop = e.clientY - dragOffset.value.y;
+  dropdownStyle.value = {
+    ...dropdownStyle.value,
+    left: `${newLeft}px`,
+    top: `${newTop}px`
+  };
+  customPosition.value = { top: newTop, left: newLeft };
+}
+
+function stopDrag() {
+  isDragging.value = false;
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 }
 
 function handleTriggerClick(e: MouseEvent) {
@@ -638,6 +691,8 @@ onUnmounted(() => {
   document.removeEventListener("mousedown", handleClickOutside);
   window.removeEventListener("scroll", handleScrollOrResize, true);
   window.removeEventListener("resize", handleScrollOrResize);
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 });
 
 defineExpose({
@@ -740,7 +795,26 @@ defineExpose({
   gap: 0 16px;
   padding: 8px 12px;
   border-bottom: 1px solid #ebeef5;
-  background: #fafafa;
+  background: linear-gradient(to bottom, #f0f5ff, #e6eeff);
+  cursor: move;
+  user-select: none;
+}
+
+.ms-filters-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.ms-dropdown-close {
+  cursor: pointer;
+  color: #909399;
+  font-size: 16px;
+  transition: color 0.2s;
+}
+
+.ms-dropdown-close:hover {
+  color: #f56c6c;
 }
 
 .ms-filters :deep(.el-checkbox__label) {

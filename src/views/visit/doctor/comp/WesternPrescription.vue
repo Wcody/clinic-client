@@ -32,6 +32,46 @@ const currentGroup = computed(
   () => props.typeData.groups[props.typeData.currentGroup]
 );
 
+// 按组号排序的药品列表
+const sortedItems = computed(() => {
+  if (!currentGroup.value?.items) return [];
+  return [...currentGroup.value.items].sort((a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0));
+});
+
+// 获取最大组号
+const getMaxGroupNo = (): number => {
+  if (!currentGroup.value?.items?.length) return 0;
+  return Math.max(...currentGroup.value.items.map(item => item.groupNo ?? 0));
+};
+
+// 新增药品时默认组号
+const getNextGroupNo = (): number => {
+  return getMaxGroupNo() + 1;
+};
+
+// 判断是否为同组第一行（用于控制频率和天数是否可编辑）
+// 第一行的定义：在 sortedItems 中，同组内排在最前面的那个（即视觉上左上角位置）
+const isGroupFirstRow = (item: PrescriptionItem): boolean => {
+  if (!currentGroup.value?.items?.length) return false;
+  const sameGroupItems = sortedItems.value.filter(i => i.groupNo === item.groupNo);
+  if (!sameGroupItems.length) return false;
+  return sameGroupItems[0] === item;
+};
+
+// 同步同组其他药品的频率、天数和用法
+const syncGroupFrequencyAndDays = (leaderItem: PrescriptionItem) => {
+  if (!currentGroup.value?.items?.length) return;
+  currentGroup.value.items.forEach(item => {
+    if (item.groupNo === leaderItem.groupNo && item !== leaderItem) {
+      item.frequency = leaderItem.frequency;
+      item.days = leaderItem.days;
+      item.useWay = leaderItem.useWay;
+      calculateTotalNum(item);
+    }
+  });
+  calculateTotalNum(leaderItem);
+};
+
 const prescriptionAmount = computed(
   () =>
     currentGroup.value?.items.reduce(
@@ -171,9 +211,20 @@ const handleAddDrug = (medicine: MedicineItem) => {
     wholesaleUnit: medicine.wholesaleUnit, //整卖单位
     conversionValue: medicine.conversionValue, //整散比
     decoWay: medicine.decoWay, //煎药方式
-    defaultSaleType: medicine.defaultSaleType //默认售卖方式
+    defaultSaleType: medicine.defaultSaleType, //默认售卖方式
+    groupNo: getNextGroupNo()
   };
   calculateTotalNum(newItem);
+  // 如果同组已有其他药品，同步该组第一行的频率、天数和用法
+  // 第一行按 sortedItems（视觉顺序）确定，与 isGroupFirstRow 保持一致
+  const sameGroupItems = sortedItems.value.filter(i => i.groupNo === newItem.groupNo && i !== newItem);
+  if (sameGroupItems.length > 0) {
+    const leader = sameGroupItems[0];
+    newItem.frequency = leader.frequency;
+    newItem.days = leader.days;
+    newItem.useWay = leader.useWay;
+    calculateTotalNum(newItem);
+  }
   currentGroup.value.items.push(newItem);
 };
 
@@ -219,24 +270,30 @@ const calculateTotalNum = (item: PrescriptionItem) => {
   const timesPerDay = matched ? matched[1] : 1;
   item.time = timesPerDay;
 
-  // 小单位总量 = 单次用量 × 频次 × 天数
-  const smallUnitTotal = singleDosage * timesPerDay * item.days;
-
-  // 整散比换算：如果有 conversionValue，换算成大单位数量，向上取整（医院不能拆盒发药）
+  // 总量 = 单次用量 × 频次 × 天数（单位是 unit）
+  const total = singleDosage * timesPerDay * item.days;
   const conversion = parseFloat(item.conversionValue || "0");
+
+  // 根据 unit 和 priceUnit 的关系决定是否换算
+  // unit = 大单位，priceUnit = 小单位 → totalNum = total × 整散比
+  // unit = 小单位，priceUnit = 大单位 → totalNum = total ÷ 整散比
+  // unit = priceUnit（相同）→ totalNum = total
   if (conversion > 0) {
-    item.totalNum = Math.ceil(smallUnitTotal / conversion);
+    if (item.unit === item.wholesaleUnit && item.priceUnit === item.prescriptionUnit) {
+      // unit=大，priceUnit=小，乘以整散比
+      item.totalNum = Math.ceil(total * conversion);
+    } else if (item.unit === item.prescriptionUnit && item.priceUnit === item.wholesaleUnit) {
+      // unit=小，priceUnit=大，除以整散比
+      item.totalNum = Math.ceil(total / conversion);
+    } else {
+      // 相同单位，不换算
+      item.totalNum = Math.ceil(total);
+    }
   } else {
-    item.totalNum = Math.ceil(smallUnitTotal);
+    // 没有整散比，不换算
+    item.totalNum = Math.ceil(total);
   }
   recalcItemPrice(item);
-};
-
-// 小单位总量 = 单次用量 × 频次 × 天数
-const calculateSmallUnitTotal = (item: PrescriptionItem): number => {
-  const singleDosage = parseFloat(item.singleDosage) || 0;
-  const timesPerDay = item.time || 1;
-  return singleDosage * timesPerDay * (item.days || 0);
 };
 
 const handleUnitChange = (item: PrescriptionItem) => {
@@ -244,48 +301,35 @@ const handleUnitChange = (item: PrescriptionItem) => {
   item.unit = opt?.name ?? "";
 
   // 根据选择的单位设置对应的单价和单价单位
-  if (item.wholesaleUnit && item.unit === item.wholesaleUnit) {
-    // 选择大单位，使用整卖价格，计价总量向上取整
-    item.price = extractNumber(item.wholesalePrice);
-    item.priceUnit = item.wholesaleUnit;
-    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
-    const conversion = parseFloat(item.conversionValue || "0");
-    if (conversion > 0) {
-      const smallUnitTotal = calculateSmallUnitTotal(item);
-      item.totalNum = Math.ceil(smallUnitTotal / conversion);
-    }
-  } else if (item.prescriptionUnit && item.unit === item.prescriptionUnit) {
-    // 选择小单位，使用散卖价格，计价总量按原逻辑计算
+  if (item.unit === item.prescriptionUnit) {
+    // 选择小单位，使用散卖价格
     item.price = extractNumber(item.prescriptionPrice);
     item.priceUnit = item.prescriptionUnit;
     item.priceUnitId = props.unitOptions.find(o => o.name === item.prescriptionUnit)?.id;
-    item.totalNum = calculateSmallUnitTotal(item);
+  } else {
+    // 选择大单位（包括 wholesaleUnit 或其他单位），使用整卖价格
+    item.price = extractNumber(item.wholesalePrice);
+    item.priceUnit = item.wholesaleUnit;
+    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
   }
-  recalcItemPrice(item);
+  // 由 calculateTotalNum 统一处理换算逻辑
+  calculateTotalNum(item);
 };
 
 const handlePriceUnitChange = (item: PrescriptionItem) => {
   const opt = props.unitOptions.find(o => o.id === item.priceUnitId);
   item.priceUnit = opt?.name ?? "";
 
-  // 切换计价单位时，重新换算总量
-  const conversion = parseFloat(item.conversionValue || "0");
-  if (conversion <= 0) return;
-
-  const singleDosage = parseFloat(item.singleDosage) || 0;
-  const timesPerDay = item.time || 1;
-  const smallUnitTotal = singleDosage * timesPerDay * (item.days || 0);
-
-  const isLargeUnit =
-    item.priceUnit === item.wholesaleUnit ||
-    item.priceUnitId === props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
-
-  if (isLargeUnit) {
-    item.totalNum = Math.ceil(smallUnitTotal / conversion);
-  } else {
-    item.totalNum = Math.ceil(smallUnitTotal);
+  // 根据选择的计价单位设置对应的单价
+  if (item.priceUnit === item.wholesaleUnit) {
+    // 计价单位是大单位，使用整卖价格
+    item.price = extractNumber(item.wholesalePrice);
+  } else if (item.priceUnit === item.prescriptionUnit) {
+    // 计价单位是小单位，使用散卖价格
+    item.price = extractNumber(item.prescriptionPrice);
   }
-  recalcItemPrice(item);
+  // 由 calculateTotalNum 统一处理换算逻辑
+  calculateTotalNum(item);
 };
 
 const getItemPriceUnit = (item: PrescriptionItem): string => {
@@ -395,11 +439,11 @@ const removeGroup = (index: number) => {
         <div class="col-amount">金额(元)</div>
       </div>
       <div class="table-body">
-        <div v-if="!currentGroup?.items?.length" class="empty-text">
+        <div v-if="!sortedItems.length" class="empty-text">
           暂无药品，请搜索添加
         </div>
         <div
-          v-for="(item, itemIdx) in currentGroup?.items"
+          v-for="(item, itemIdx) in sortedItems"
           :key="itemIdx"
           class="prescription-item-row"
         >
@@ -408,12 +452,20 @@ const removeGroup = (index: number) => {
               type="danger"
               link
               size="small"
-              @click="removeItem(itemIdx)"
+              @click="removeItem(currentGroup.items.indexOf(item))"
             >
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          <div class="col-group">{{ itemIdx + 1 }}</div>
+          <div class="col-group">
+            <el-input
+              v-model.number="item.groupNo"
+              size="small"
+              type="number"
+              style="width: 100%"
+              min="1"
+            />
+          </div>
           <div class="col-name">{{ item.itemName }}</div>
           <div class="col-spec">{{ item.spec }}</div>
           <div class="col-dosage">
@@ -447,6 +499,8 @@ const removeGroup = (index: number) => {
               style="width: 100%"
               placeholder="用法"
               clearable
+              :disabled="!isGroupFirstRow(item)"
+              @change="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
             >
               <el-option
                 v-for="opt in props.usageOptions"
@@ -463,7 +517,8 @@ const removeGroup = (index: number) => {
               style="width: 100%"
               placeholder="频率"
               clearable
-              @change="calculateTotalNum(item)"
+              :disabled="!isGroupFirstRow(item)"
+              @change="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
             >
               <el-option
                 v-for="opt in props.frequencyOptions"
@@ -479,8 +534,9 @@ const removeGroup = (index: number) => {
               size="small"
               type="number"
               :min="1"
+              :disabled="!isGroupFirstRow(item)"
               style="width: 100%"
-              @change="calculateTotalNum(item)"
+              @input="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
             />
           </div>
           <div class="col-total">

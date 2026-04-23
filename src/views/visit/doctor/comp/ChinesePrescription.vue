@@ -33,6 +33,23 @@ const currentGroup = computed(
   () => props.typeData.groups[props.typeData.currentGroup]
 );
 
+// 按组号排序的药品列表
+const sortedItems = computed(() => {
+  if (!currentGroup.value?.items) return [];
+  return [...currentGroup.value.items].sort((a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0));
+});
+
+// 获取最大组号
+const getMaxGroupNo = (): number => {
+  if (!currentGroup.value?.items?.length) return 0;
+  return Math.max(...currentGroup.value.items.map(item => item.groupNo ?? 0));
+};
+
+// 新增药品时默认组号
+const getNextGroupNo = (): number => {
+  return getMaxGroupNo() + 1;
+};
+
 const prescriptionAmount = computed(
   () =>
     currentGroup.value?.items.reduce(
@@ -45,9 +62,12 @@ const prescriptionAmount = computed(
 const batch = reactive({
   useWay: "",
   frequency: "",
+  usageType: undefined as number | undefined,
+  frequence: undefined as number | undefined,
   days: 7,
   totalDoses: 7,
   entrust: "",
+  decoWay: "",
   wholesaleUnit: "",
   prescriptionUnit: ""
 });
@@ -73,7 +93,23 @@ const getTimesPerDay = (frequency: string): number => {
   return matched ? matched[1] : 1;
 };
 
-// 频率或天数变化 → 重算总剂数 → 批量应用
+// 用法变化 → 设置 usageType ID 并批量应用
+const onUseWayChange = (val: string) => {
+  const opt = props.usageOptions.find(o => o.name === val);
+  batch.usageType = opt?.id;
+  applyBatchToItems();
+};
+
+// 频率变化 → 设置 frequence ID，重算总剂数并批量应用
+const onFrequencyChange = (val: string) => {
+  const opt = props.frequencyOptions.find(o => o.name === val);
+  batch.frequence = opt?.id;
+  const timesPerDay = getTimesPerDay(batch.frequency);
+  batch.totalDoses = Number((timesPerDay * batch.days).toFixed(2));
+  applyBatchToItems();
+};
+
+// 天数变化 → 重算总剂数并批量应用
 const onFrequencyOrDaysChange = () => {
   const timesPerDay = getTimesPerDay(batch.frequency);
   batch.totalDoses = Number((timesPerDay * batch.days).toFixed(2));
@@ -88,11 +124,20 @@ const onTotalDosesChange = () => {
 // 将批量设置写入当前组所有明细
 const applyBatchToItems = () => {
   if (!currentGroup.value) return;
+  // 同步到组的主表字段
+  currentGroup.value.usageType = batch.usageType;
+  currentGroup.value.frequence = batch.frequence;
+  currentGroup.value.doseAmount = batch.totalDoses;
+  currentGroup.value.days = batch.days;
+  currentGroup.value.recommendation = batch.entrust;
+  currentGroup.value.decoWay = batch.decoWay;
+  // 同步到所有明细
   currentGroup.value.items.forEach(item => {
     item.useWay = batch.useWay;
     item.frequency = batch.frequency;
     item.days = batch.days;
     item.entrust = batch.entrust;
+    item.decoWay = batch.decoWay || item.decoWay;
     // 单位设置：如果两个都设置了，用设置的；如果没设置或只设置了一个，用item的药库值填充所有单位
     if (batch.wholesaleUnit && batch.prescriptionUnit) {
       // 两个都设置了
@@ -183,7 +228,8 @@ const handleAddDrug = (medicine: MedicineItem) => {
     wholesalePrice: medicine.wholesalePrice, //整卖价格
     wholesaleUnit: medicine.wholesaleUnit, //整卖单位
     conversionValue: medicine.conversionValue, //整散比
-    decoWay: medicine.decoWay //煎药方式
+    decoWay: medicine.decoWay, //煎药方式
+    groupNo: getNextGroupNo()
   });
   recalcItemTotalNum(currentGroup.value.items[currentGroup.value.items.length - 1]);
 };
@@ -278,25 +324,39 @@ const applyTemplateSettings = (settings: {
   usageTypeName?: string;
   frequenceName?: string;
   doseAmount?: number;
+  days?: number;
   decoWay?: string;
+  recommendation?: string;
+  skipApplyItems?: boolean;
 }) => {
   if (settings.usageTypeName) {
     batch.useWay = settings.usageTypeName;
+    const opt = props.usageOptions.find(o => o.name === settings.usageTypeName);
+    batch.usageType = opt?.id;
   }
   if (settings.frequenceName) {
     batch.frequency = settings.frequenceName;
+    const opt = props.frequencyOptions.find(o => o.name === settings.frequenceName);
+    batch.frequence = opt?.id;
   }
   if (settings.doseAmount) {
     batch.totalDoses = settings.doseAmount;
-    batch.days = settings.doseAmount;
+    batch.days = settings.days ?? settings.doseAmount;
+  } else if (settings.days) {
+    batch.days = settings.days;
   }
   if (settings.decoWay) {
-    batch.entrust = settings.decoWay;
+    batch.decoWay = settings.decoWay;
   }
-  applyBatchToItems();
+  if (settings.recommendation) {
+    batch.entrust = settings.recommendation;
+  }
+  if (!settings.skipApplyItems) {
+    applyBatchToItems();
+  }
 };
 
-defineExpose({ applyTemplateSettings });
+defineExpose({ applyTemplateSettings, applyBatchToItems });
 </script>
 
 <template>
@@ -334,7 +394,7 @@ defineExpose({ applyTemplateSettings });
         placeholder="用法"
         class="batch-select"
         clearable
-        @change="applyBatchToItems"
+        @change="onUseWayChange"
       >
         <el-option
           v-for="opt in props.usageOptions"
@@ -349,7 +409,7 @@ defineExpose({ applyTemplateSettings });
         placeholder="频率"
         class="batch-select-wide"
         clearable
-        @change="onFrequencyOrDaysChange"
+        @change="onFrequencyChange"
       >
         <el-option
           v-for="opt in props.frequencyOptions"
@@ -403,11 +463,11 @@ defineExpose({ applyTemplateSettings });
         <div class="col-amount">金额(元)</div>
       </div>
       <div class="table-body">
-        <div v-if="!currentGroup?.items?.length" class="empty-text">
+        <div v-if="!sortedItems.length" class="empty-text">
           暂无药品，请搜索添加
         </div>
         <div
-          v-for="(item, itemIdx) in currentGroup?.items"
+          v-for="(item, itemIdx) in sortedItems"
           :key="itemIdx"
           class="prescription-item-row"
         >
@@ -416,13 +476,21 @@ defineExpose({ applyTemplateSettings });
               type="danger"
               link
               size="small"
-              @click="removeItem(itemIdx)"
+              @click="removeItem(currentGroup.items.indexOf(item))"
             >
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          <div class="col-group">{{ itemIdx + 1 }}</div>
-        <div class="col-name">{{ item.itemName }}</div>
+          <div class="col-group">
+            <el-input
+              v-model.number="item.groupNo"
+              size="small"
+              type="number"
+              style="width: 100%"
+              min="1"
+            />
+          </div>
+          <div class="col-name">{{ item.itemName }}</div>
           <div class="col-spec">{{ item.spec }}</div>
           <div class="col-deco">
             <el-select

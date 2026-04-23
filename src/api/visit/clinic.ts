@@ -161,6 +161,10 @@ export type BqPrescriptionEntityType = {
   recommendation?: string;
   /** 天数 */
   days?: number;
+  /** 诊断 */
+  diagnosis?: string;
+  /** 诊断ID列表 */
+  diagnosisIds?: string;
   /** 状态:1已开 2已缴费 3已发药 4作废 */
   status?: number;
   /** 行乐观锁 */
@@ -208,6 +212,8 @@ export type BqPrescriptionItemEntityType = {
   price?: number;
   /** 金额 */
   totalPrice?: number;
+  /** 组号 */
+  groupNo?: number;
   createdTime?: string;
 };
 
@@ -285,6 +291,19 @@ export type BqMedicalRecordPageResultType = BQResultType<
 export type BqPrescriptionResultType = BQResultType<BqPrescriptionEntityType>;
 export type BqPrescriptionListResultType = BQResultType<
   BQSearchListResultType<BqPrescriptionEntityType>
+>;
+
+// ==================== 处方主表扩展类型（带诊断信息，对应 BqPrescriptionWithDiagnosisVo）====================
+
+export type BqPrescriptionWithDiagnosisType = BqPrescriptionEntityType & {
+  /** 诊断结果文本 */
+  diagnosis?: string;
+  /** 诊断ID串（逗号分隔） */
+  diagnosisIds?: string;
+};
+
+export type BqPrescriptionWithDiagnosisListResultType = BQResultType<
+  BqPrescriptionWithDiagnosisType[]
 >;
 
 export type BqPrescriptionItemResultType =
@@ -452,6 +471,13 @@ export type BqSaveMedicalOrderGroupDtoType = {
   groupNo: string;
   totalPrice: number;
   items: Partial<BqPrescriptionItemEntityType>[];
+  // 中药处方主表字段
+  usageType?: number;
+  frequence?: number;
+  doseAmount?: number;
+  days?: number;
+  recommendation?: string;
+  decoWay?: string; // 煎药方式
 };
 
 export type BqSaveMedicalOrderDtoType = {
@@ -553,6 +579,25 @@ export const getPrescriptionListByPatientIdApi = (
   return http.request<BqPrescriptionListResultType>(
     "get",
     `${PRESCRIPTION}/list`,
+    { params }
+  );
+};
+
+/**
+ * 根据患者ID查询历史处方列表（带诊断信息）
+ */
+export const getPrescriptionListWithDiagnosisByPatientIdApi = (
+  patientId: number,
+  size = 50
+) => {
+  const params = {
+    size,
+    filters: [new BQSearchFilter("patientId", "eq", String(patientId))],
+    orders: [new BQSearchOrder("createdTime", false)]
+  };
+  return http.request<BqPrescriptionWithDiagnosisListResultType>(
+    "get",
+    `${PRESCRIPTION}/listWithDiagnosis`,
     { params }
   );
 };
@@ -679,15 +724,17 @@ export const getPrescriptionFullListByRegIdApi = (regId: number) => {
 
 /**
  * 生成处方PDF，返回 Blob 供前端打印预览
- * GET /prescription/printPdf?regId=xxx&showPrice=true
+ * GET /prescription/printPdf?regId=xxx&showPrice=true&printCurrent=false&prescType=1
  */
 export const printPrescriptionPdfApi = (
   regId: number,
-  showPrice: boolean
+  showPrice: boolean,
+  printCurrent: boolean = false,
+  prescType?: number
 ): Promise<Blob> => {
   return http.download(
     `${PRESCRIPTION}/printPdf`,
-    { params: { regId, showPrice } },
+    { params: { regId, showPrice, printCurrent, prescType } },
     { baseURL: import.meta.env.VITE_API_BASE_URL, timeout: 240 * 1000 }
   );
 };

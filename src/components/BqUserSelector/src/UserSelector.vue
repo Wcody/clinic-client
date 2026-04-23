@@ -181,6 +181,16 @@ watch(
 );
 
 // ---- 患者数据映射 ----
+interface User {
+  id: string;
+  name: string;
+  gender: string;
+  age: string;
+  phone: string;
+  idCard: string;
+  pinyin: string;
+}
+
 function mapPatientToUser(p: BQVisitPatientEntityType): User {
   return {
     id: String(p.id),
@@ -188,7 +198,8 @@ function mapPatientToUser(p: BQVisitPatientEntityType): User {
     gender: p.gender === "女" ? "女" : "男",
     age: p.age ?? "",
     phone: p.mobile ?? "",
-    idCard: p.idCard ?? ""
+    idCard: p.idCard ?? "",
+    pinyin: p.pinyin ?? ""
   };
 }
 
@@ -212,16 +223,9 @@ async function fetchPatients(kw: string) {
 }
 
 // ---- Computed ----
-// 本地即时过滤（让用户输入后立即看到反馈），服务端搜索完成后再更新为完整结果
+// 直接使用 API 返回的数据，不做本地过滤
 const filteredData = computed<User[]>(() => {
-  const kw = keyword.value.trim().toLowerCase();
-  if (!kw) return apiData.value;
-  return apiData.value.filter(
-    u =>
-      u.name.toLowerCase().includes(kw) ||
-      u.phone.includes(kw) ||
-      u.idCard.toLowerCase().includes(kw)
-  );
+  return apiData.value;
 });
 
 const totalPages = computed(() =>

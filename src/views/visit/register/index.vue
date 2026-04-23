@@ -206,8 +206,8 @@ const getSecondUnitText = (ageType: number) => {
 // 选择患者时自动填充信息并锁定患者信息字段
 const handlePatientChange = (value: any) => {
   // 注意：patientName 已通过 v-model 自动更新，无需在此重复设置
+  registrationForm.patientId = value.id ?? value.patientId ?? 0;
   registrationForm.patientName = value.name;
-  registrationForm.patientId = value.id;
   registrationForm.idCard = value.idCard || "";
   registrationForm.gender = value.gender === "男" ? 1 : 0;
   registrationForm.contact = value.mobile || "";
@@ -247,7 +247,9 @@ const handlePatientSave = async (formData: any) => {
   loading.value = true;
   try {
     await updateVisitPatientApi({
-      id: Number(registrationForm.patientId),
+      id:
+        patientBasicInfoRef.value?.form?.id ??
+        Number(registrationForm.patientId),
       name: formData.name || "",
       gender: formData.gender || "",
       mobile: formData.mobile || "",

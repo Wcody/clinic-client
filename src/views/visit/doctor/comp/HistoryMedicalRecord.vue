@@ -26,8 +26,11 @@ type HistoryRecord = {
   presentIllness: string;
   pastHistory: string;
   diagnosis: string;
+  diagnosisIds: string;
   advice: string;
   physicalExam: HistoryPhysicalExam;
+  height?: string;
+  weight?: string;
 };
 
 const visible = ref(false);
@@ -55,8 +58,11 @@ const load = async () => {
         presentIllness: record.presentIllness || "",
         pastHistory: record.pastHistory || "",
         diagnosis: record.diagnosis || "",
+        diagnosisIds: record.diagnosisIds || "",
         advice: record.advice || "",
-        physicalExam
+        physicalExam,
+        height: record.height != null ? String(record.height) : "",
+        weight: record.weight != null ? String(record.weight) : ""
       };
     });
   } finally {
@@ -67,6 +73,17 @@ const load = async () => {
 const open = () => {
   visible.value = true;
   load();
+};
+
+const emit = defineEmits<{
+  confirm: [record: HistoryRecord];
+}>();
+
+const handleConfirm = () => {
+  if (list.value.length > 0 && selectedIndex.value >= 0) {
+    emit("confirm", list.value[selectedIndex.value]);
+    visible.value = false;
+  }
 };
 
 defineExpose({ open });
@@ -105,87 +122,121 @@ defineExpose({ open });
       </div>
       <div v-if="list.length > 0" class="record-detail">
         <template v-if="list[selectedIndex]">
-          <div class="detail-row">
-            <span class="detail-label">就诊时间</span>
-            <span class="detail-value">{{ list[selectedIndex].visitTime }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">就诊类型</span>
-            <span class="detail-value">{{ list[selectedIndex].visitType }}</span>
-          </div>
-          <div v-if="list[selectedIndex].chiefComplaint" class="detail-row">
-            <span class="detail-label">主诉</span>
-            <span class="detail-value">{{ list[selectedIndex].chiefComplaint }}</span>
-          </div>
-          <div v-if="list[selectedIndex].presentIllness" class="detail-row">
-            <span class="detail-label">现病史</span>
-            <span class="detail-value">{{ list[selectedIndex].presentIllness }}</span>
-          </div>
-          <div v-if="list[selectedIndex].pastHistory" class="detail-row">
-            <span class="detail-label">既往史</span>
-            <span class="detail-value">{{ list[selectedIndex].pastHistory }}</span>
-          </div>
-          <div v-if="list[selectedIndex].physicalExam?.temperature" class="detail-row">
-            <span class="detail-label">体温</span>
-            <span class="detail-value">{{ list[selectedIndex].physicalExam.temperature }} ℃</span>
-          </div>
-          <div v-if="list[selectedIndex].physicalExam?.heartRate" class="detail-row">
-            <span class="detail-label">心率</span>
-            <span class="detail-value">{{ list[selectedIndex].physicalExam.heartRate }} 次/分</span>
-          </div>
-          <div v-if="list[selectedIndex].physicalExam?.respiration" class="detail-row">
-            <span class="detail-label">呼吸</span>
-            <span class="detail-value">{{ list[selectedIndex].physicalExam.respiration }} 次/分</span>
-          </div>
-          <div
-            v-if="list[selectedIndex].physicalExam?.bloodPressureSystolic"
-            class="detail-row"
-          >
-            <span class="detail-label">血压</span>
-            <span class="detail-value">
-              {{ list[selectedIndex].physicalExam.bloodPressureSystolic }} /
-              {{ list[selectedIndex].physicalExam.bloodPressureDiastolic ?? "--" }} mmHg
-            </span>
-          </div>
-          <div v-if="list[selectedIndex].physicalExam?.other" class="detail-row">
-            <span class="detail-label">其他检查</span>
-            <span class="detail-value">{{ list[selectedIndex].physicalExam.other }}</span>
-          </div>
-          <div v-if="list[selectedIndex].diagnosis" class="detail-row">
-            <span class="detail-label">诊断</span>
-            <span class="detail-value diagnosis-red">{{ list[selectedIndex].diagnosis }}</span>
-          </div>
-          <div v-if="list[selectedIndex].advice" class="detail-row">
-            <span class="detail-label">治疗建议</span>
-            <span class="detail-value">{{ list[selectedIndex].advice }}</span>
+          <div class="detail-header">
+            <div class="detail-row">
+              <span class="detail-label">就诊时间</span>
+              <span class="detail-value">{{ list[selectedIndex].visitTime }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">就诊类型</span>
+              <span class="detail-value">{{ list[selectedIndex].visitType }}</span>
+            </div>
+            <div v-if="list[selectedIndex].chiefComplaint" class="detail-row">
+              <span class="detail-label">主诉</span>
+              <span class="detail-value">{{ list[selectedIndex].chiefComplaint }}</span>
+            </div>
+            <div v-if="list[selectedIndex].presentIllness" class="detail-row">
+              <span class="detail-label">现病史</span>
+              <span class="detail-value">{{ list[selectedIndex].presentIllness }}</span>
+            </div>
+            <div v-if="list[selectedIndex].pastHistory" class="detail-row">
+              <span class="detail-label">既往史</span>
+              <span class="detail-value">{{ list[selectedIndex].pastHistory }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">体温</span>
+              <span class="detail-value">{{ list[selectedIndex].physicalExam?.temperature || '--' }} ℃</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">心率</span>
+              <span class="detail-value">{{ list[selectedIndex].physicalExam?.heartRate || '--' }} 次/分</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">呼吸</span>
+              <span class="detail-value">{{ list[selectedIndex].physicalExam?.respiration || '--' }} 次/分</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">血压</span>
+              <span class="detail-value">
+                {{ list[selectedIndex].physicalExam?.bloodPressureSystolic || '--' }} /
+                {{ list[selectedIndex].physicalExam?.bloodPressureDiastolic || '--' }} mmHg
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">其他检查</span>
+              <span class="detail-value">{{ list[selectedIndex].physicalExam?.other || '--' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">身高</span>
+              <span class="detail-value">{{ list[selectedIndex].height || '--' }} cm</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">体重</span>
+              <span class="detail-value">{{ list[selectedIndex].weight || '--' }} kg</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">诊断</span>
+              <span class="detail-value diagnosis-red">{{ list[selectedIndex].diagnosis || '--' }}</span>
+            </div>
+            <div v-if="list[selectedIndex].diagnosisIds" class="detail-row">
+              <span class="detail-label">诊断编码</span>
+              <span class="detail-value">{{ list[selectedIndex].diagnosisIds }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">治疗建议</span>
+              <span class="detail-value">{{ list[selectedIndex].advice || '--' }}</span>
+            </div>
           </div>
         </template>
       </div>
     </div>
+    <template #footer>
+      <el-button @click="visible = false">取消</el-button>
+      <el-button
+        type="primary"
+        :disabled="list.length === 0"
+        @click="handleConfirm"
+      >
+        导入当前病历
+      </el-button>
+    </template>
   </el-dialog>
 </template>
 
 <style scoped lang="scss">
 .history-medical-record-dialog {
   :deep(.el-dialog) {
-    width: auto;
+    --el-dialog-width: 90vw;
+    width: var(--el-dialog-width);
+    height: 70vh;
     max-width: none;
   }
 
   :deep(.el-dialog__body) {
     padding: 0;
+    height: 70vh;
+    min-height: 70vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 12px 16px;
+    border-top: 1px solid #e4e7ed;
   }
 }
 
 .dialog-body {
   display: flex;
-  min-height: 50vh;
-  max-height: 50vh;
+  flex: 1;
+  min-height: 0;
+  height: 70vh;
+  overflow: hidden;
 }
 
 .record-list {
   width: 220px;
-  height: 100%;
   flex-shrink: 0;
   border-right: 1px solid #e4e7ed;
   overflow-y: auto;
@@ -234,11 +285,16 @@ defineExpose({ open });
 .record-detail {
   flex: 1;
   min-width: 0;
-  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   padding: 16px;
   box-sizing: border-box;
+}
+
+.detail-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 16px;
 }
 
 .detail-row {

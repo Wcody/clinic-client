@@ -183,24 +183,26 @@ defineExpose({ open });
           <span class="detail-label">处方模板信息：</span>
           <div v-if="!currentTemplate" class="empty-text">请选择模板</div>
           <table v-else class="info-table">
-            <tr>
-              <th>模板名称</th>
-              <td>{{ currentTemplate.name || '' }}</td>
-              <th>处方类型</th>
-              <td>{{ currentTemplate.prescriptionType === 1 ? '西/成药' : currentTemplate.prescriptionType === 2 ? '中药' : currentTemplate.prescriptionType === 3 ? '检查检验' : currentTemplate.prescriptionType === 4 ? '处置项目' : '' }}</td>
-            </tr>
-            <tr>
-              <th>用法</th>
-              <td>{{ getUsageName(currentTemplate.usageType) }}</td>
-              <th>频率</th>
-              <td>{{ getFrequencyName(currentTemplate.frequence) }}</td>
-            </tr>
-            <tr>
-              <th>剂数</th>
-              <td>{{ currentTemplate.doseAmount || '' }}</td>
-              <th>建议/医嘱</th>
-              <td>{{ currentTemplate.recommendation || '' }}</td>
-            </tr>
+            <tbody>
+              <tr>
+                <th>模板名称</th>
+                <td>{{ currentTemplate.name || '' }}</td>
+                <th>处方类型</th>
+                <td>{{ currentTemplate.prescriptionType === 1 ? '西/成药' : currentTemplate.prescriptionType === 2 ? '中药' : currentTemplate.prescriptionType === 3 ? '检查检验' : currentTemplate.prescriptionType === 4 ? '处置项目' : '' }}</td>
+              </tr>
+              <tr>
+                <th>用法</th>
+                <td>{{ getUsageName(currentTemplate.usageType) }}</td>
+                <th>频率</th>
+                <td>{{ getFrequencyName(currentTemplate.frequence) }}</td>
+              </tr>
+              <tr>
+                <th>剂数</th>
+                <td>{{ currentTemplate.doseAmount || '' }}</td>
+                <th>建议/医嘱</th>
+                <td>{{ currentTemplate.recommendation || '' }}</td>
+              </tr>
+            </tbody>
           </table>
         </div>
         <div class="detail-drugs">

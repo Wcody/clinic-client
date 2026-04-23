@@ -24,6 +24,7 @@ export type PrescriptionItem = {
   conversionValue?: string; //整散比
   decoWay?: string; //煎药方式
   defaultSaleType?: number; //默认售卖方式: 0整卖 1散卖
+  groupNo?: number; //组号，用于同组行排序
 };
 
 export type PrescriptionGroup = {
@@ -31,6 +32,11 @@ export type PrescriptionGroup = {
   prescType: number;
   prescId?: number;
   items: PrescriptionItem[];
+  // 中药处方主表字段
+  usageType?: number;
+  frequence?: number;
+  doseAmount?: number;
+  recommendation?: string;
 };
 
 export type PrescriptionTypeData = {

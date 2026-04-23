@@ -372,6 +372,7 @@ function clearValidate() {
 // ---- 选中用户后自动填充并锁定 ----
 function onUserSelect(user: any) {
   emit("beforePatientSelect", user);
+  confirmPatientSelect(user);
 }
 
 function confirmPatientSelect(user: any) {

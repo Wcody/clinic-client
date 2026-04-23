@@ -7,11 +7,10 @@ import { useRenderIcon } from "@/components/ReIcon/src/hooks";
 import { deviceDetection } from "@pureadmin/utils";
 import { useWindowSize } from "@vueuse/core";
 import PureTable from "@pureadmin/table";
-import {
-  getChargeListApi,
-  FeeStatus,
-  RegistrationStatus
-} from "@/api/visit/register";
+import PatientDetail from "./comp/PatientDetail.vue";
+import { getChargeListApi, FeeStatus } from "@/api/visit/register";
+import router from "@/router";
+import dayjs from "dayjs";
 
 defineOptions({
   name: "PharmacyChargeList"
@@ -42,19 +41,41 @@ const updateOffsetBottom = () => {
 };
 
 const handleTabChange = () => {
-  setTimeout(() => {
-    updateOffsetBottom();
-  }, 200);
-  handleQuery();
+  // lazy tab 首次切换时 DOM 还未渲染，需要延迟查询
+  nextTick(() => {
+    setTimeout(() => {
+      updateOffsetBottom();
+      handleQuery();
+    }, 100);
+  });
 };
 
-// ==================== 待收费 ====================
-const pendingColumns = ref([
+// ==================== 年龄格式化 ====================
+const formatAge = (row: any) => {
+  const { firstAge, lastAge, ageType } = row;
+  if (firstAge == null) return "";
+  if (ageType === 1) {
+    return lastAge ? `${firstAge}岁${lastAge}月` : `${firstAge}岁`;
+  }
+  if (ageType === 2) {
+    return lastAge ? `${firstAge}月${lastAge}天` : `${firstAge}月`;
+  }
+  if (ageType === 3) return `${firstAge}天`;
+  return String(firstAge);
+};
+
+// ==================== 待缴费 ====================
+const pendingColumns = ref<any>([
   { label: "序号", prop: "index", minWidth: 80, slot: "index" },
   { label: "姓名", prop: "patient", minWidth: 120 },
   { label: "性别", prop: "gender", minWidth: 80 },
-  { label: "年龄", prop: "age", minWidth: 100 },
-  { label: "总金额", prop: "totalPrice", minWidth: 120 },
+  { label: "年龄", prop: "firstAge", minWidth: 100, slot: "pendingAge" },
+  {
+    label: "总金额",
+    prop: "totalPrice",
+    minWidth: 120,
+    slot: "pendingTotalPrice"
+  },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "挂号时间", prop: "orderTime", minWidth: 160 },
   { label: "收费状态", prop: "statusFee", minWidth: 100 },
@@ -69,22 +90,33 @@ const pendingPagination = reactive({
   total: 0
 });
 
-// ==================== 已诊患者 ====================
+// ==================== 待缴费查询表单 ====================
+const pendingQueryForm = reactive({
+  patientName: "",
+  dateRange: ["", ""]
+});
+
+// ==================== 已缴费查询表单 ====================
 const diagnosedQueryForm = reactive({
   patientName: "",
   dateRange: ["", ""]
 });
 
-const diagnosedColumns = ref([
+const diagnosedColumns = ref<any>([
   { label: "姓名", prop: "patient", minWidth: 150 },
   { label: "性别", prop: "gender", minWidth: 100 },
-  { label: "年龄", prop: "age", minWidth: 120 },
-  { label: "总金额", prop: "totalPrice", minWidth: 120 },
+  { label: "年龄", prop: "firstAge", minWidth: 120, slot: "diagnosedAge" },
+  {
+    label: "总金额",
+    prop: "totalPrice",
+    minWidth: 120,
+    slot: "diagnosedTotalPrice"
+  },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "就诊时间", prop: "orderTime", minWidth: 180 },
   { label: "就诊状态", prop: "status", minWidth: 100 },
   { label: "收费状态", prop: "statusFee", minWidth: 100 },
-  { label: "操作", fixed: "right", width: 150, slot: "diagnosedOperation" }
+  { label: "操作", fixed: "right", width: 300, slot: "diagnosedOperation" }
 ]);
 
 const diagnosedList = ref([]);
@@ -98,18 +130,29 @@ const diagnosedPagination = reactive({
 // ==================== 方法 ====================
 const handleQuery = async () => {
   if (activeTab.value === "pending") {
+    const startTime = pendingQueryForm.dateRange?.[0]
+      ? `${pendingQueryForm.dateRange[0]} 00:00:00`
+      : undefined;
+    const endTime = pendingQueryForm.dateRange?.[1]
+      ? `${pendingQueryForm.dateRange[1]} 23:59:59`
+      : undefined;
+    const params: Record<string, any> = {
+      statusFee: FeeStatus.UNPAID,
+      currentPage: pendingPagination.currentPage,
+      pageSize: pendingPagination.pageSize
+    };
+    if (pendingQueryForm.patientName)
+      params.patientName = pendingQueryForm.patientName;
+    if (startTime) params.startTime = startTime;
+    if (endTime) params.endTime = endTime;
     try {
-      const res = await getChargeListApi({
-        statusFee: FeeStatus.UNPAID,
-        currentPage: pendingPagination.currentPage,
-        pageSize: pendingPagination.pageSize
-      });
+      const res = await getChargeListApi(params);
       if (res?.data) {
         pendingList.value = res.data.list ?? [];
         pendingPagination.total = res.data.total ?? 0;
       }
     } catch {
-      ElMessage.error("获取待收费列表失败");
+      ElMessage.error("获取待缴费列表失败");
     }
   } else {
     const startTime = diagnosedQueryForm.dateRange?.[0]
@@ -119,11 +162,12 @@ const handleQuery = async () => {
       ? `${diagnosedQueryForm.dateRange[1]} 23:59:59`
       : undefined;
     const params: Record<string, any> = {
-      status: RegistrationStatus.RECEIVED,
+      statusFee: FeeStatus.PAID,
       currentPage: diagnosedPagination.currentPage,
       pageSize: diagnosedPagination.pageSize
     };
-    if (diagnosedQueryForm.patientName) params.patientName = diagnosedQueryForm.patientName;
+    if (diagnosedQueryForm.patientName)
+      params.patientName = diagnosedQueryForm.patientName;
     if (startTime) params.startTime = startTime;
     if (endTime) params.endTime = endTime;
     try {
@@ -133,20 +177,30 @@ const handleQuery = async () => {
         diagnosedPagination.total = res.data.total ?? 0;
       }
     } catch {
-      ElMessage.error("获取已诊患者列表失败");
+      ElMessage.error("获取已缴费列表失败");
     }
   }
 };
 
 const handleSearch = () => {
-  diagnosedPagination.currentPage = 1;
+  if (activeTab.value === "pending") {
+    pendingPagination.currentPage = 1;
+  } else {
+    diagnosedPagination.currentPage = 1;
+  }
   handleQuery();
 };
 
 const handleResetQuery = () => {
-  diagnosedQueryForm.patientName = "";
-  diagnosedQueryForm.dateRange = ["", ""];
-  diagnosedPagination.currentPage = 1;
+  if (activeTab.value === "pending") {
+    pendingQueryForm.patientName = "";
+    pendingQueryForm.dateRange = ["", ""];
+    pendingPagination.currentPage = 1;
+  } else {
+    diagnosedQueryForm.patientName = "";
+    diagnosedQueryForm.dateRange = ["", ""];
+    diagnosedPagination.currentPage = 1;
+  }
   handleQuery();
 };
 
@@ -170,12 +224,40 @@ const handleDiagnosedSizeChange = (size: number) => {
   handleQuery();
 };
 
+// ==================== 患者详情（已缴费tab） ====================
+const showPatientDetail = ref(false);
+const selectedPatient = ref<any>(null);
+
 const handleViewPatientDetail = (row: any) => {
-  ElMessage.info(`查看患者详情: ${row.patient}`);
+  selectedPatient.value = row;
+  showPatientDetail.value = true;
 };
 
+const handlePatientDetailBack = () => {
+  showPatientDetail.value = false;
+  selectedPatient.value = null;
+};
+
+// ==================== 缴费（待缴费tab）- 跳转到 WorkDoctor ====================
+const handlePayFee = (row: any) => {
+  router.push({
+    name: "WorkDoctor",
+    query: {
+      regId: row.id,
+      patientId: row.patientId
+    }
+  });
+};
+
+// ==================== 就诊详情（已缴费tab）- 跳转到 WorkDoctor ====================
 const handleViewVisitDetail = (row: any) => {
-  ElMessage.info(`查看就诊详情: ${row.patient}`);
+  router.push({
+    name: "WorkDoctor",
+    query: {
+      regId: row.id,
+      patientId: row.patientId
+    }
+  });
 };
 
 onMounted(() => {
@@ -190,10 +272,52 @@ onMounted(() => {
       class="visit-tabs"
       @tab-click="handleTabChange"
     >
-      <!-- 待收费 -->
-      <el-tab-pane label="待收费" name="pending">
+      <!-- 待缴费 -->
+      <el-tab-pane label="待缴费" name="pending">
         <div class="tab-content">
           <div class="main">
+            <el-form
+              ref="queryFormRef"
+              :model="pendingQueryForm"
+              :inline="true"
+              class="search-form bg-bg_color w-[99/100] pl-8 pt-[12px] overflow-auto"
+            >
+              <el-form-item label="患者姓名">
+                <el-input
+                  v-model="pendingQueryForm.patientName"
+                  placeholder="请输入患者姓名"
+                  clearable
+                  class="!w-[180px]"
+                />
+              </el-form-item>
+              <el-form-item label="就诊时间">
+                <el-date-picker
+                  v-model="pendingQueryForm.dateRange"
+                  type="daterange"
+                  range-separator="-"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  value-format="YYYY-MM-DD"
+                  class="!w-[280px]"
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  :icon="useRenderIcon('ri:search-line')"
+                  @click="handleSearch"
+                >
+                  查询
+                </el-button>
+                <el-button
+                  :icon="useRenderIcon(Refresh)"
+                  @click="handleResetQuery"
+                >
+                  重置
+                </el-button>
+              </el-form-item>
+            </el-form>
+
             <div
               ref="contentRef"
               :class="['flex', deviceDetection() ? 'flex-wrap' : '']"
@@ -201,7 +325,7 @@ onMounted(() => {
               <PureTableBar
                 :class="['w-full', '!mt-0']"
                 style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
-                title="待收费"
+                title="待缴费"
                 :columns="pendingColumns"
                 @refresh="handleQuery"
               >
@@ -234,15 +358,23 @@ onMounted(() => {
                         1
                       }}</span>
                     </template>
+                    <template #pendingAge="{ row }">
+                      <span>{{ formatAge(row) }}</span>
+                    </template>
+                    <template #pendingTotalPrice="{ row }">
+                      <span class="text-red-500 font-bold"
+                        >￥{{ row.totalPrice?.toFixed(2) ?? "0.00" }}</span
+                      >
+                    </template>
                     <template #pendingOperation="{ row }">
                       <el-button
                         class="reset-margin"
                         link
                         type="primary"
                         :size="size"
-                        @click="handleViewPatientDetail(row)"
+                        @click="handlePayFee(row)"
                       >
-                        收费
+                        缴费
                       </el-button>
                     </template>
                   </pure-table>
@@ -253,10 +385,18 @@ onMounted(() => {
         </div>
       </el-tab-pane>
 
-      <!-- 已诊患者 -->
-      <el-tab-pane label="已诊患者" name="diagnosed">
+      <!-- 已缴费 -->
+      <el-tab-pane label="已缴费" name="diagnosed" lazy>
         <div class="tab-content">
-          <div class="main">
+          <!-- 患者详情覆盖层 -->
+          <PatientDetail
+            v-if="showPatientDetail && selectedPatient"
+            :patient="selectedPatient"
+            class="detail-overlay"
+            @back="handlePatientDetailBack"
+          />
+
+          <div v-show="!showPatientDetail" class="main">
             <el-form
               ref="queryFormRef"
               :model="diagnosedQueryForm"
@@ -304,9 +444,9 @@ onMounted(() => {
               :class="['flex', deviceDetection() ? 'flex-wrap' : '']"
             >
               <PureTableBar
-                :class="['w-full']"
+                :class="['w-full', '!mt-0']"
                 style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
-                title="已诊患者"
+                title="已缴费"
                 :columns="diagnosedColumns"
                 @refresh="handleQuery"
               >
@@ -331,6 +471,14 @@ onMounted(() => {
                     @page-size-change="handleDiagnosedSizeChange"
                     @page-current-change="handleDiagnosedPageChange"
                   >
+                    <template #diagnosedAge="{ row }">
+                      <span>{{ formatAge(row) }}</span>
+                    </template>
+                    <template #diagnosedTotalPrice="{ row }">
+                      <span class="text-red-500 font-bold"
+                        >￥{{ row.totalPrice?.toFixed(2) ?? "0.00" }}</span
+                      >
+                    </template>
                     <template #diagnosedOperation="{ row }">
                       <el-button
                         class="reset-margin"
@@ -404,6 +552,15 @@ onMounted(() => {
     height: calc(100vh - 169px);
     padding: 0;
     background-color: white;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .detail-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background-color: #fff;
     overflow: hidden;
   }
 }

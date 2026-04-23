@@ -46,7 +46,6 @@ const saveLoading = ref(false);
 // 患者表单（仅包含基本信息字段）
 const patientForm = reactive({
   id: 0,
-  patientId: 0,
   name: "",
   gender: "男",
   age: "",
@@ -70,7 +69,6 @@ let snapshot: typeof patientForm = { ...patientForm };
 
 const initForm = () => {
   patientForm.id = 0;
-  patientForm.patientId = 0;
   patientForm.name = "";
   patientForm.gender = "男";
   patientForm.age = "";
@@ -207,7 +205,6 @@ const handleSave = async () => {
   try {
     await updateVisitPatientApi({
       id: patientForm.id,
-      patientId: patientForm.patientId,
       name: patientForm.name,
       gender: patientForm.gender,
       age: patientForm.age,
@@ -276,7 +273,6 @@ const loadData = async () => {
       // 简化赋值：直接映射基本信息字段
       Object.assign(patientForm, {
         id: patient.id,
-        patientId: patient.patientId || 0,
         name: patient.name || "",
         gender: patient.gender || "男",
         age: patient.age || "",

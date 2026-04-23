@@ -57,6 +57,7 @@ export type BQVisitPatientEntityType = {
   obstericalHistory: string; // 婚育史
   travelHistory: string; // 旅行史
   contactHistory: string; // 接触史
+  pinyin: string; // 姓名拼音首字母
   version: number;
   deleted: boolean;
   deletedTime: string | null;

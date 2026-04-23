@@ -54,10 +54,13 @@ const updateOffsetBottom = () => {
 
 // 监听标签页切换
 const handleTabChange = () => {
-  setTimeout(() => {
-    updateOffsetBottom();
-  }, 200);
-  handleQuery();
+  // lazy tab 首次切换时 DOM 还未渲染，需要延迟查询
+  nextTick(() => {
+    setTimeout(() => {
+      updateOffsetBottom();
+      handleQuery();
+    }, 100);
+  });
 };
 
 // ==================== 年龄格式化 ====================
@@ -81,7 +84,12 @@ const pendingColumns = ref<any>([
   { label: "性别", prop: "gender", minWidth: 40 },
   { label: "年龄", prop: "firstAge", minWidth: 80, slot: "pendingAge" },
   { label: "挂号号", prop: "registrationNo", minWidth: 120 },
-  { label: "总金额", prop: "totalPrice", minWidth: 120 },
+  {
+    label: "总金额",
+    prop: "totalPrice",
+    minWidth: 120,
+    slot: "pendingTotalPrice"
+  },
   { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "挂号时间", prop: "orderTime", minWidth: 160 },
@@ -97,6 +105,15 @@ const pendingPagination = reactive({
   total: 0
 });
 
+// ==================== 待诊患者查询表单 ====================
+const pendingQueryForm = reactive({
+  patientName: "",
+  dateRange: [
+    dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
+    dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+  ]
+});
+
 // ==================== 已诊患者 ====================
 const diagnosedQueryForm = reactive({
   patientName: "",
@@ -110,7 +127,12 @@ const diagnosedColumns = ref<any>([
   { label: "姓名", prop: "patient", minWidth: 150 },
   { label: "性别", prop: "gender", minWidth: 100 },
   { label: "年龄", prop: "firstAge", minWidth: 120, slot: "diagnosedAge" },
-  { label: "总金额", prop: "totalPrice", minWidth: 120 },
+  {
+    label: "总金额",
+    prop: "totalPrice",
+    minWidth: 120,
+    slot: "diagnosedTotalPrice"
+  },
   { label: "科室", prop: "department", minWidth: 120 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "就诊时间", prop: "orderTime", minWidth: 180 },
@@ -133,11 +155,19 @@ const handleQuery = async () => {
     if (activeTab.value === "pending") {
       // 查询待诊患者（status = "待接诊"）
       const params: BQVisitRecordSearchParams = {
-        patientName: diagnosedQueryForm.patientName,
+        patientName: pendingQueryForm.patientName,
         status: "待接诊",
         currentPage: pendingPagination.currentPage,
         pageSize: pendingPagination.pageSize
       };
+
+      if (
+        pendingQueryForm.dateRange &&
+        pendingQueryForm.dateRange.length === 2
+      ) {
+        params.startTime = pendingQueryForm.dateRange[0];
+        params.endTime = pendingQueryForm.dateRange[1];
+      }
 
       const res = await getVisitRecordListApi(params);
       console.log("查询待诊患者接口返回：", res);
@@ -191,11 +221,19 @@ const handleSearch = () => {
 
 // 重置查询
 const handleResetQuery = () => {
-  diagnosedQueryForm.patientName = "";
-  diagnosedQueryForm.dateRange = ["", ""];
   if (activeTab.value === "pending") {
+    pendingQueryForm.patientName = "";
+    pendingQueryForm.dateRange = [
+      dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
+      dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+    ];
     pendingPagination.currentPage = 1;
   } else {
+    diagnosedQueryForm.patientName = "";
+    diagnosedQueryForm.dateRange = [
+      dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
+      dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+    ];
     diagnosedPagination.currentPage = 1;
   }
   handleQuery();
@@ -326,6 +364,13 @@ onMounted(() => {
                       <span>{{ formatAge(row) }}</span>
                     </template>
 
+                    <!-- 总金额列 -->
+                    <template #pendingTotalPrice="{ row }">
+                      <span class="text-red-500 font-bold"
+                        >￥{{ row.totalPrice?.toFixed(2) ?? "0.00" }}</span
+                      >
+                    </template>
+
                     <!-- 操作列 -->
                     <template #pendingOperation="{ row }">
                       <el-button
@@ -347,7 +392,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <!-- 已诊患者 -->
-      <el-tab-pane label="已诊患者" name="diagnosed">
+      <el-tab-pane label="已诊患者" name="diagnosed" lazy>
         <div class="tab-content">
           <!-- 患者详情覆盖层 -->
           <PatientDetail
@@ -407,7 +452,7 @@ onMounted(() => {
               :class="['flex', deviceDetection() ? 'flex-wrap' : '']"
             >
               <PureTableBar
-                :class="['w-full']"
+                :class="['w-full', '!mt-0']"
                 style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
                 title="已诊患者"
                 :columns="diagnosedColumns"
@@ -438,6 +483,13 @@ onMounted(() => {
                     <!-- 年龄列 -->
                     <template #diagnosedAge="{ row }">
                       <span>{{ formatAge(row) }}</span>
+                    </template>
+
+                    <!-- 总金额列 -->
+                    <template #diagnosedTotalPrice="{ row }">
+                      <span class="text-red-500 font-bold"
+                        >￥{{ row.totalPrice?.toFixed(2) ?? "0.00" }}</span
+                      >
                     </template>
 
                     <!-- 操作列 -->
@@ -480,6 +532,21 @@ onMounted(() => {
 .search-form {
   :deep(.el-form-item) {
     margin-bottom: 12px;
+  }
+}
+
+.main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .search-form {
+    flex-shrink: 0;
+  }
+
+  > div:last-child {
+    flex: 1;
+    overflow: hidden;
   }
 }
 

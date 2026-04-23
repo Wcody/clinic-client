@@ -33,6 +33,23 @@ const currentGroup = computed(
   () => props.typeData.groups[props.typeData.currentGroup]
 );
 
+// 按组号排序的列表
+const sortedItems = computed(() => {
+  if (!currentGroup.value?.items) return [];
+  return [...currentGroup.value.items].sort((a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0));
+});
+
+// 获取最大组号
+const getMaxGroupNo = (): number => {
+  if (!currentGroup.value?.items?.length) return 0;
+  return Math.max(...currentGroup.value.items.map(item => item.groupNo ?? 0));
+};
+
+// 新增时默认组号
+const getNextGroupNo = (): number => {
+  return getMaxGroupNo() + 1;
+};
+
 const prescriptionAmount = computed(
   () =>
     currentGroup.value?.items.reduce(
@@ -66,7 +83,8 @@ const handleAddExamItem = (item: BQExamineItemEntityType) => {
     totalNum: 1,
     entrust: "",
     price,
-    totalPrice: price
+    totalPrice: price,
+    groupNo: getNextGroupNo()
   });
 };
 
@@ -89,7 +107,8 @@ const handleAddTreatmentItem = (item: BQTreatmentItemEntityType) => {
     totalNum: 1,
     entrust: "",
     price,
-    totalPrice: price
+    totalPrice: price,
+    groupNo: getNextGroupNo()
   });
 };
 
@@ -156,11 +175,11 @@ const removeGroup = (index: number) => {
         <div class="col-amount">金额(元)</div>
       </div>
       <div class="table-body">
-        <div v-if="!currentGroup?.items?.length" class="empty-text">
+        <div v-if="!sortedItems.length" class="empty-text">
           暂无项目，请搜索添加
         </div>
         <div
-          v-for="(item, itemIdx) in currentGroup?.items"
+          v-for="(item, itemIdx) in sortedItems"
           :key="itemIdx"
           class="prescription-item-row"
         >
@@ -169,12 +188,20 @@ const removeGroup = (index: number) => {
               type="danger"
               link
               size="small"
-              @click="removeItem(itemIdx)"
+              @click="removeItem(currentGroup.items.indexOf(item))"
             >
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
-          <div class="col-group">{{ itemIdx + 1 }}</div>
+          <div class="col-group">
+            <el-input
+              v-model.number="item.groupNo"
+              size="small"
+              type="number"
+              style="width: 100%"
+              min="1"
+            />
+          </div>
           <div class="col-name">{{ item.itemName }}</div>
           <div class="col-spec">{{ item.spec }}</div>
           <div class="col-total">
