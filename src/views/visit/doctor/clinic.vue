@@ -1105,7 +1105,8 @@ const collectPrescriptionGroups = (): {
           entrust: item.entrust,
           price: item.price,
           totalPrice: item.totalPrice,
-          groupNo: item.groupNo
+          groupNo: item.groupNo,
+          decoWay: item.decoWay
         }))
       });
     });
