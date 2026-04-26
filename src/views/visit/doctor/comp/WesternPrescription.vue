@@ -576,7 +576,7 @@ const removeGroup = (index: number) => {
               min="0"
               @input="recalcItemPrice(item)"
             />
-            <span class="price-unit-label"> /{{ item.priceUnit }} </span>
+            <span class="price-unit-label">/{{ item.priceUnit }}</span>
           </div>
           <div class="col-amount">{{ (item.totalPrice || 0).toFixed(2) }}</div>
         </div>
@@ -689,27 +689,30 @@ const removeGroup = (index: number) => {
       }
 
       .col-name {
-        flex: 1;
-        min-width: 130px;
+        width: 200px;
+        flex-shrink: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .col-spec {
-        width: 88px;
+        width: 108px;
         flex-shrink: 0;
       }
 
       .col-dosage {
-        width: 72px;
+        width: 60px;
         flex-shrink: 0;
       }
 
       .col-unit {
-        width: 80px;
+        width: 60px;
         flex-shrink: 0;
       }
 
       .col-usage {
-        width: 90px;
+        width: 70px;
         flex-shrink: 0;
       }
 
@@ -719,7 +722,7 @@ const removeGroup = (index: number) => {
       }
 
       .col-days {
-        width: 72px;
+        width: 40px;
         flex-shrink: 0;
 
         input[type="number"]::-webkit-outer-spin-button,
@@ -743,24 +746,30 @@ const removeGroup = (index: number) => {
       }
 
       .col-note {
-        width: 110px;
-        flex-shrink: 0;
+        flex: 1;
+        min-width: 110px;
       }
 
       .col-price {
-        width: 136px;
+        width: 70px;
         flex-shrink: 0;
+        overflow: hidden;
         display: flex;
+        flex-direction: row;
         align-items: center;
-        gap: 4px;
-        padding-right: 4px;
+
+        :deep(.el-input) {
+          width: 50px;
+          flex-shrink: 0;
+        }
 
         .price-unit-label {
-          white-space: nowrap;
-          font-size: 12px;
+          font-size: 11px;
           color: #f56c6c;
           font-weight: 700;
-          flex-shrink: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         input[type="number"]::-webkit-outer-spin-button,
@@ -777,10 +786,12 @@ const removeGroup = (index: number) => {
       }
 
       .col-amount {
-        width: 72px;
+        width: 60px;
         flex-shrink: 0;
         text-align: right;
         padding-right: 4px;
+        overflow: hidden;
+        white-space: nowrap;
       }
     }
 
@@ -792,8 +803,12 @@ const removeGroup = (index: number) => {
       font-weight: 600;
       color: #606266;
       font-size: 13px;
-      min-width: 1060px;
+      min-width: 1400px;
       gap: 4px;
+
+      .col-days {
+        color: #409eff;
+      }
     }
 
     .table-body {
@@ -813,11 +828,17 @@ const removeGroup = (index: number) => {
         padding: 5px 0;
         border-bottom: 1px solid #f0f0f0;
         font-size: 13px;
-        min-width: 1060px;
+        font-weight: 700;
+        min-width: 1400px;
         gap: 4px;
 
         &:last-child {
           border-bottom: none;
+        }
+
+        :deep(.el-input__inner),
+        :deep(.el-select__selected-item) {
+          font-weight: 700;
         }
 
         .col-group {
@@ -827,6 +848,14 @@ const removeGroup = (index: number) => {
         .col-spec {
           color: #909399;
           font-size: 12px;
+        }
+
+        .col-days {
+          color: #409eff;
+
+          :deep(.el-input__inner) {
+            color: #409eff;
+          }
         }
 
         .col-total {

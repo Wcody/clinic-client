@@ -1283,47 +1283,6 @@ const handlePrintPrescription = async (
   printCurrent: boolean,
   prescType?: number
 ) => {
-  const form = basicInfoRef.value?.form;
-  const { groupRefs, prescriptions } = collectPrescriptionGroups();
-
-  if (prescriptions.length > 0) {
-    if (!form?.name?.trim()) {
-      ElMessage.warning("请先填写患者基本信息");
-      return;
-    }
-    try {
-      const res = await saveMedicalOrderApi({
-        patientId: form.id || undefined,
-        patientName: form.name,
-        gender: form.gender,
-        firstAge: form.firstAge,
-        lastAge: form.lastAge,
-        ageType: form.ageType,
-        idCard: form.idCard,
-        mobile: form.mobile,
-        province: form.province ?? undefined,
-        city: form.city ?? undefined,
-        district: form.district ?? undefined,
-        address: form.address,
-        isAllergy: form.isAllergy,
-        allergicHistory: form.allergicHistory,
-        regId: currentRegId.value || undefined,
-        isFirstVisit: form.isFirstVisit,
-        recordId: currentMedicalRecordId.value || undefined,
-        prescriptions
-      });
-      if (res?.data) {
-        applyMedicalOrderResult(res.data, groupRefs);
-      } else {
-        ElMessage.error("保存医嘱失败，无法打印");
-        return;
-      }
-    } catch {
-      ElMessage.error("保存失败，无法打印");
-      return;
-    }
-  }
-
   const regId = currentRegId.value;
   if (!regId) {
     ElMessage.warning("暂无处方信息，请先录入并保存");
@@ -1497,6 +1456,38 @@ const loadFromRoute = async (newRegId?: number | string, newPatientId?: number |
     loadRegId = cached.regId;
     loadPatientId = cached.patientId;
   }
+
+  // 切换患者前先重置所有业务状态，防止旧数据残留
+  currentMedicalRecordId.value = undefined;
+  currentRegStatus.value = null;
+  currentRegStatusFee.value = null;
+  forceShowSaveBtn.value = false;
+  diagnosisCollapsed.value = false;
+  medicalRecordForm.chiefComplaint = "";
+  medicalRecordForm.presentIllness = "";
+  medicalRecordForm.pastHistory = "";
+  medicalRecordForm.allergyHistory = 0;
+  medicalRecordForm.allergyDetail = "";
+  medicalRecordForm.personalHistory = "";
+  medicalRecordForm.marriageHistory = "";
+  medicalRecordForm.familyHistory = "";
+  medicalRecordForm.travelHistory = "";
+  medicalRecordForm.contactHistory = "";
+  medicalRecordForm.temperature = "";
+  medicalRecordForm.heartRate = "";
+  medicalRecordForm.respiration = "";
+  medicalRecordForm.bloodPressureSystolic = "";
+  medicalRecordForm.bloodPressureDiastolic = "";
+  medicalRecordForm.otherExamination = "";
+  medicalRecordForm.diagnoses = [];
+  medicalRecordForm.treatmentAdvice = "";
+  Object.values(medicalOrderForm.prescriptionData).forEach(td => {
+    const prescType = td.groups[0]?.prescType ?? 1;
+    const prefix = prescType === 3 || prescType === 4 ? "项目" : "处方";
+    td.groups = [{ name: `${prefix}1`, prescType, items: [] }];
+    td.currentGroup = 0;
+  });
+  medicalOrderForm.additionalFees = [];
 
   try {
     const patientRes = await getPatientByIdApi(loadPatientId);
@@ -1915,6 +1906,16 @@ watch(
                       @update="(index, amount) => medicalOrderForm.additionalFees[index].amount = amount"
                     />
                   </div>
+                </el-form-item>
+
+                <!-- 治疗建议 -->
+                <el-form-item label="治疗建议" class="form-row">
+                  <el-input
+                    v-model="medicalRecordForm.treatmentAdvice"
+                    type="textarea"
+                    :rows="3"
+                    class="form-input-full"
+                  />
                 </el-form-item>
 
                 <!-- 合计总金额 -->

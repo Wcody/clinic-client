@@ -419,12 +419,12 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
         />
       </el-select>
 
-      <span class="batch-label">天数</span>
+      <span class="batch-label batch-days-label">天数</span>
       <el-input-number
         v-model="batch.days"
         :min="1"
         :step="1"
-        class="batch-num"
+        class="batch-num batch-days"
         controls-position="right"
         @change="onFrequencyOrDaysChange"
       />
@@ -674,6 +674,18 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
       width: 100px;
     }
 
+    .batch-days-label {
+      color: #409eff;
+      font-weight: 700;
+    }
+
+    .batch-days {
+      :deep(.el-input__inner) {
+        color: #409eff;
+        font-weight: 700;
+      }
+    }
+
     .batch-entrust {
       width: 140px;
     }
@@ -802,6 +814,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
         padding: 5px 0;
         border-bottom: 1px solid #f0f0f0;
         font-size: 13px;
+        font-weight: 700;
         min-width: 640px;
         gap: 4px;
         box-sizing: border-box;
@@ -813,6 +826,11 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
 
         &:last-child {
           border-bottom: none;
+        }
+
+        :deep(.el-input__inner),
+        :deep(.el-select__selected-item) {
+          font-weight: 700;
         }
 
         .col-group {

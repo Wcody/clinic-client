@@ -695,6 +695,11 @@ defineExpose({
   width: 100%;
 }
 
+.allergy-textarea :deep(textarea) {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
 :deep(.el-radio) {
   margin-right: 16px;
 }

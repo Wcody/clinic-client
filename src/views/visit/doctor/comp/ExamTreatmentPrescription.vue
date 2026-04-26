@@ -407,10 +407,16 @@ const removeGroup = (index: number) => {
         padding: 5px 0;
         border-bottom: 1px solid #f0f0f0;
         font-size: 13px;
+        font-weight: 700;
         gap: 4px;
 
         &:last-child {
           border-bottom: none;
+        }
+
+        :deep(.el-input__inner),
+        :deep(.el-select__selected-item) {
+          font-weight: 700;
         }
 
         .col-group {

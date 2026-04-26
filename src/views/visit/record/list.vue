@@ -109,8 +109,8 @@ const pendingPagination = reactive({
 const pendingQueryForm = reactive({
   patientName: "",
   dateRange: [
-    dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
-    dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+    dayjs().subtract(1, "week").format("YYYY-MM-DD"),
+    dayjs().format("YYYY-MM-DD")
   ]
 });
 
@@ -118,8 +118,8 @@ const pendingQueryForm = reactive({
 const diagnosedQueryForm = reactive({
   patientName: "",
   dateRange: [
-    dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
-    dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+    dayjs().subtract(1, "week").format("YYYY-MM-DD"),
+    dayjs().format("YYYY-MM-DD")
   ]
 });
 
@@ -161,13 +161,9 @@ const handleQuery = async () => {
         pageSize: pendingPagination.pageSize
       };
 
-      if (
-        pendingQueryForm.dateRange &&
-        pendingQueryForm.dateRange.length === 2
-      ) {
-        params.startTime = pendingQueryForm.dateRange[0];
-        params.endTime = pendingQueryForm.dateRange[1];
-      }
+      const today = dayjs().format("YYYY-MM-DD");
+      params.startTime = `${today} 00:00:00`;
+      params.endTime = `${today} 23:59:59`;
 
       const res = await getVisitRecordListApi(params);
       console.log("查询待诊患者接口返回：", res);
@@ -190,8 +186,8 @@ const handleQuery = async () => {
         diagnosedQueryForm.dateRange &&
         diagnosedQueryForm.dateRange.length === 2
       ) {
-        params.startTime = diagnosedQueryForm.dateRange[0];
-        params.endTime = diagnosedQueryForm.dateRange[1];
+        params.startTime = `${diagnosedQueryForm.dateRange[0]} 00:00:00`;
+        params.endTime = `${diagnosedQueryForm.dateRange[1]} 23:59:59`;
       }
 
       const res = await getVisitRecordListApi(params);
@@ -220,19 +216,31 @@ const handleSearch = () => {
 };
 
 // 重置查询
+const handleQuickDate = (type: "today" | "week" | "month" | "year") => {
+  const end = dayjs().format("YYYY-MM-DD");
+  let start: string;
+  if (type === "today") start = end;
+  else if (type === "week") start = dayjs().subtract(1, "week").format("YYYY-MM-DD");
+  else if (type === "month") start = dayjs().subtract(1, "month").format("YYYY-MM-DD");
+  else start = dayjs().subtract(1, "year").format("YYYY-MM-DD");
+  diagnosedQueryForm.dateRange = [start, end];
+  diagnosedPagination.currentPage = 1;
+  handleQuery();
+};
+
 const handleResetQuery = () => {
   if (activeTab.value === "pending") {
     pendingQueryForm.patientName = "";
     pendingQueryForm.dateRange = [
-      dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
-      dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+      dayjs().subtract(1, "month").format("YYYY-MM-DD"),
+      dayjs().add(1, "day").format("YYYY-MM-DD")
     ];
     pendingPagination.currentPage = 1;
   } else {
     diagnosedQueryForm.patientName = "";
     diagnosedQueryForm.dateRange = [
-      dayjs().subtract(1, "month").startOf("day").format("YYYY-MM-DD HH:mm:ss"),
-      dayjs().add(1, "day").startOf("day").format("YYYY-MM-DD HH:mm:ss")
+      dayjs().subtract(1, "month").format("YYYY-MM-DD"),
+      dayjs().add(1, "day").format("YYYY-MM-DD")
     ];
     diagnosedPagination.currentPage = 1;
   }
@@ -443,6 +451,10 @@ onMounted(() => {
                 >
                   重置
                 </el-button>
+                <el-button @click="handleQuickDate('today')">今天</el-button>
+                <el-button @click="handleQuickDate('week')">近一周</el-button>
+                <el-button @click="handleQuickDate('month')">近一月</el-button>
+                <el-button @click="handleQuickDate('year')">近一年</el-button>
               </el-form-item>
             </el-form>
 

@@ -78,8 +78,8 @@ const pendingColumns = ref<any>([
   },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "挂号时间", prop: "orderTime", minWidth: 160 },
-  { label: "收费状态", prop: "statusFee", minWidth: 100 },
-  { label: "操作", fixed: "right", width: 150, slot: "pendingOperation" }
+  { label: "收费状态", prop: "statusFee", minWidth: 100, hide: true },
+  { label: "操作", fixed: "right", width: 150, slot: "pendingOperation", hide: true }
 ]);
 
 const pendingList = ref([]);
@@ -93,13 +93,13 @@ const pendingPagination = reactive({
 // ==================== 待缴费查询表单 ====================
 const pendingQueryForm = reactive({
   patientName: "",
-  dateRange: ["", ""]
+  dateRange: [dayjs().subtract(1, "week").format("YYYY-MM-DD"), dayjs().format("YYYY-MM-DD")]
 });
 
 // ==================== 已缴费查询表单 ====================
 const diagnosedQueryForm = reactive({
   patientName: "",
-  dateRange: ["", ""]
+  dateRange: [dayjs().subtract(1, "week").format("YYYY-MM-DD"), dayjs().format("YYYY-MM-DD")]
 });
 
 const diagnosedColumns = ref<any>([
@@ -115,8 +115,8 @@ const diagnosedColumns = ref<any>([
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "就诊时间", prop: "orderTime", minWidth: 180 },
   { label: "就诊状态", prop: "status", minWidth: 100 },
-  { label: "收费状态", prop: "statusFee", minWidth: 100 },
-  { label: "操作", fixed: "right", width: 300, slot: "diagnosedOperation" }
+  { label: "收费状态", prop: "statusFee", minWidth: 100, hide: true },
+  { label: "操作", fixed: "right", width: 300, slot: "diagnosedOperation", hide: true }
 ]);
 
 const diagnosedList = ref([]);
@@ -191,14 +191,31 @@ const handleSearch = () => {
   handleQuery();
 };
 
+const handleQuickDate = (type: "today" | "week" | "month" | "year") => {
+  const end = dayjs().format("YYYY-MM-DD");
+  let start: string;
+  if (type === "today") start = end;
+  else if (type === "week") start = dayjs().subtract(1, "week").format("YYYY-MM-DD");
+  else if (type === "month") start = dayjs().subtract(1, "month").format("YYYY-MM-DD");
+  else start = dayjs().subtract(1, "year").format("YYYY-MM-DD");
+  if (activeTab.value === "pending") {
+    pendingQueryForm.dateRange = [start, end];
+    pendingPagination.currentPage = 1;
+  } else {
+    diagnosedQueryForm.dateRange = [start, end];
+    diagnosedPagination.currentPage = 1;
+  }
+  handleQuery();
+};
+
 const handleResetQuery = () => {
   if (activeTab.value === "pending") {
     pendingQueryForm.patientName = "";
-    pendingQueryForm.dateRange = ["", ""];
+    pendingQueryForm.dateRange = [dayjs().subtract(1, "week").format("YYYY-MM-DD"), dayjs().format("YYYY-MM-DD")];
     pendingPagination.currentPage = 1;
   } else {
     diagnosedQueryForm.patientName = "";
-    diagnosedQueryForm.dateRange = ["", ""];
+    diagnosedQueryForm.dateRange = [dayjs().subtract(1, "week").format("YYYY-MM-DD"), dayjs().format("YYYY-MM-DD")];
     diagnosedPagination.currentPage = 1;
   }
   handleQuery();
@@ -315,6 +332,10 @@ onMounted(() => {
                 >
                   重置
                 </el-button>
+                <el-button @click="handleQuickDate('today')">今天</el-button>
+                <el-button @click="handleQuickDate('week')">近一周</el-button>
+                <el-button @click="handleQuickDate('month')">近一月</el-button>
+                <el-button @click="handleQuickDate('year')">近一年</el-button>
               </el-form-item>
             </el-form>
 
@@ -436,6 +457,10 @@ onMounted(() => {
                 >
                   重置
                 </el-button>
+                <el-button @click="handleQuickDate('today')">今天</el-button>
+                <el-button @click="handleQuickDate('week')">近一周</el-button>
+                <el-button @click="handleQuickDate('month')">近一月</el-button>
+                <el-button @click="handleQuickDate('year')">近一年</el-button>
               </el-form-item>
             </el-form>
 

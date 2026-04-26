@@ -128,7 +128,12 @@ const emit = defineEmits<{
     </el-form-item>
 
     <el-form-item label="治疗建议" class="form-row">
-      <el-input v-model="props.form.treatmentAdvice" class="form-input-full" />
+      <el-input
+        v-model="props.form.treatmentAdvice"
+        type="textarea"
+        :rows="3"
+        class="form-input-full"
+      />
     </el-form-item>
   </el-form>
 </template>
