@@ -214,6 +214,8 @@ export type BqPrescriptionItemEntityType = {
   totalPrice?: number;
   /** 组号 */
   groupNo?: number;
+  /** 煎药方式（字典ID字符串） */
+  decoWay?: string;
   createdTime?: string;
 };
 

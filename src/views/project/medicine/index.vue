@@ -53,6 +53,17 @@ const unitIdOptions = ref<{ label: string; value: number }[]>([]);
 const useWayOptions = ref<{ label: string; value: string }[]>([]);
 const frequencyOptions = ref<{ label: string; value: string }[]>([]);
 const decoWayOptions = ref<{ label: string; value: string }[]>([]);
+// 原始字典数据，用于名称↔ID互转（兼容存量数据）
+const useWayRaw = ref<BQMedicalDictionaryEntityType[]>([]);
+const frequencyRaw = ref<BQMedicalDictionaryEntityType[]>([]);
+const decoWayRaw = ref<BQMedicalDictionaryEntityType[]>([]);
+
+const nameToId = (raw: BQMedicalDictionaryEntityType[], nameOrId?: string | null): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = raw.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
 
 const loadUnitOptions = async () => {
   try {
@@ -83,10 +94,11 @@ const loadUseWayOptions = async () => {
       filters: [new BQSearchFilter("dictType", "eq", 1)]
     });
     if (res.code === 0 && res.data) {
+      useWayRaw.value = res.data;
       useWayOptions.value = res.data.map(
         (item: BQMedicalDictionaryEntityType) => ({
           label: item.name,
-          value: item.name
+          value: String(item.id)
         })
       );
     }
@@ -101,10 +113,11 @@ const loadFrequencyOptions = async () => {
       filters: [new BQSearchFilter("dictType", "eq", 2)]
     });
     if (res.code === 0 && res.data) {
+      frequencyRaw.value = res.data;
       frequencyOptions.value = res.data.map(
         (item: BQMedicalDictionaryEntityType) => ({
           label: item.name,
-          value: item.name
+          value: String(item.id)
         })
       );
     }
@@ -119,10 +132,11 @@ const loadDecoWayOptions = async () => {
       filters: [new BQSearchFilter("dictType", "eq", 5 + "")]
     });
     if (res.code === 0 && res.data) {
+      decoWayRaw.value = res.data;
       decoWayOptions.value = res.data.map(
         (item: BQMedicalDictionaryEntityType) => ({
           label: item.name,
-          value: item.name
+          value: String(item.id)
         })
       );
     }
@@ -364,9 +378,9 @@ const handleEdit = (row: BQDrugEntityType) => {
   medicineForm.supplier = row.supplier || "";
   medicineForm.singleDosage = row.singleDosage || "";
   medicineForm.unitId = row.unitId ?? undefined;
-  medicineForm.useWay = row.useWay ?? undefined;
-  medicineForm.frequency = row.frequency ?? undefined;
-  medicineForm.decoWay = row.decoWay || "";
+  medicineForm.useWay = nameToId(useWayRaw.value, row.useWay);
+  medicineForm.frequency = nameToId(frequencyRaw.value, row.frequency);
+  medicineForm.decoWay = nameToId(decoWayRaw.value, row.decoWay) ?? "";
 
   dialogVisible.value = true;
 };

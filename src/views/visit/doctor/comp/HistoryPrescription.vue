@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { Document } from "@element-plus/icons-vue";
 import {
   getPrescriptionListWithDiagnosisByPatientIdApi,
@@ -20,12 +20,21 @@ const itemsLoading = ref(false);
 const items = ref<BqPrescriptionItemEntityType[]>([]);
 const importDiagnosis = ref(false);
 
+const getDatePart = (datetime?: string) => (datetime ?? "").slice(0, 10);
+
+const showDateAtIndex = computed(() =>
+  list.value.map((item, idx) =>
+    idx === 0 || getDatePart(item.createdTime) !== getDatePart(list.value[idx - 1].createdTime)
+  )
+);
+
 const prescTypeLabel = (type?: number) => {
   const map: Record<number, string> = {
     1: "西/成药处方",
     2: "中药处方",
     3: "检查检验",
-    4: "处置项目"
+    4: "处置项目",
+    5: "附加费"
   };
   return type != null ? (map[type] ?? "处方") : "处方";
 };
@@ -64,7 +73,12 @@ const load = async () => {
   selectedIndex.value = 0;
   try {
     const res = await getPrescriptionListWithDiagnosisByPatientIdApi(props.patientId);
-    list.value = (res?.data as any)?.records ?? res?.data ?? [];
+    const raw = (res?.data as any)?.records ?? res?.data ?? [];
+    list.value = [...raw].sort((a, b) => {
+      const ta = a.createdTime ?? "";
+      const tb = b.createdTime ?? "";
+      return tb < ta ? -1 : tb > ta ? 1 : 0;
+    });
     if (list.value.length > 0 && list.value[0].id) {
       loadItems(list.value[0].id);
     }
@@ -118,7 +132,7 @@ defineExpose({ open });
         >
           <el-icon class="item-icon"><Document /></el-icon>
           <span class="item-text">
-            <span class="item-time">{{ presc.createdTime }}</span>
+            <span v-if="showDateAtIndex[idx]" class="item-date">{{ getDatePart(presc.createdTime) }}</span>
             <span class="item-type">{{ prescTypeLabel(presc.prescType) }}</span>
           </span>
         </div>
@@ -289,7 +303,7 @@ defineExpose({ open });
     flex-direction: column;
     font-size: 12px;
 
-    .item-time {
+    .item-date {
       color: #606266;
     }
 

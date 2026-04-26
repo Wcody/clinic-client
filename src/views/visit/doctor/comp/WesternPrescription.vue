@@ -35,7 +35,9 @@ const currentGroup = computed(
 // 按组号排序的药品列表
 const sortedItems = computed(() => {
   if (!currentGroup.value?.items) return [];
-  return [...currentGroup.value.items].sort((a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0));
+  return [...currentGroup.value.items].sort(
+    (a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0)
+  );
 });
 
 // 获取最大组号
@@ -53,7 +55,9 @@ const getNextGroupNo = (): number => {
 // 第一行的定义：在 sortedItems 中，同组内排在最前面的那个（即视觉上左上角位置）
 const isGroupFirstRow = (item: PrescriptionItem): boolean => {
   if (!currentGroup.value?.items?.length) return false;
-  const sameGroupItems = sortedItems.value.filter(i => i.groupNo === item.groupNo);
+  const sameGroupItems = sortedItems.value.filter(
+    i => i.groupNo === item.groupNo
+  );
   if (!sameGroupItems.length) return false;
   return sameGroupItems[0] === item;
 };
@@ -137,7 +141,12 @@ const handleAddDrug = (medicine: MedicineItem) => {
   if (!currentGroup.value) return;
 
   console.log("handleAddDrug medicine:", medicine);
-  console.log("defaultSaleType:", medicine.defaultSaleType, "type:", typeof medicine.defaultSaleType);
+  console.log(
+    "defaultSaleType:",
+    medicine.defaultSaleType,
+    "type:",
+    typeof medicine.defaultSaleType
+  );
 
   // 根据 defaultSaleType 设置默认单位和单价
   let resolvedUnit = "";
@@ -159,7 +168,9 @@ const handleAddDrug = (medicine: MedicineItem) => {
       resolvedUnit = uObj.name;
       resolvedUnitId = uObj.id;
     } else {
-      const uObj2 = props.unitOptions.find(o => o.id + "" === medicine.wholesaleUnit);
+      const uObj2 = props.unitOptions.find(
+        o => o.id + "" === medicine.wholesaleUnit
+      );
       if (uObj2) {
         resolvedPriceUnit = uObj2.name;
         resolvedPriceUnitId = uObj2.id;
@@ -170,14 +181,18 @@ const handleAddDrug = (medicine: MedicineItem) => {
   } else {
     // 散卖：用小单位
     resolvedPrice = extractNumber(medicine.prescriptionPrice);
-    const uObj = props.unitOptions.find(o => o.name === medicine.prescriptionUnit);
+    const uObj = props.unitOptions.find(
+      o => o.name === medicine.prescriptionUnit
+    );
     if (uObj) {
       resolvedPriceUnit = uObj.name;
       resolvedPriceUnitId = uObj.id;
       resolvedUnit = uObj.name;
       resolvedUnitId = uObj.id;
     } else {
-      const uObj2 = props.unitOptions.find(o => o.id + "" === medicine.prescriptionUnit);
+      const uObj2 = props.unitOptions.find(
+        o => o.id + "" === medicine.prescriptionUnit
+      );
       if (uObj2) {
         resolvedPriceUnit = uObj2.name;
         resolvedPriceUnitId = uObj2.id;
@@ -198,8 +213,8 @@ const handleAddDrug = (medicine: MedicineItem) => {
     singleDosage: medicine.singleDosage ?? "", //单次用量
     unit: resolvedUnit, //单次用量单位名称
     unitId: resolvedUnitId, //单次用量单位id
-    useWay: medicine.useWay ?? "",
-    frequency: medicine.frequency ?? "",
+    useWay: getFrequencyId(medicine.useWay), // 将用法名称转换为ID
+    frequency: getFrequencyId(medicine.frequency), // 将频率名称转换为ID
     time: 1,
     days: 7,
     totalNum: 0,
@@ -217,7 +232,9 @@ const handleAddDrug = (medicine: MedicineItem) => {
   calculateTotalNum(newItem);
   // 如果同组已有其他药品，同步该组第一行的频率、天数和用法
   // 第一行按 sortedItems（视觉顺序）确定，与 isGroupFirstRow 保持一致
-  const sameGroupItems = sortedItems.value.filter(i => i.groupNo === newItem.groupNo && i !== newItem);
+  const sameGroupItems = sortedItems.value.filter(
+    i => i.groupNo === newItem.groupNo && i !== newItem
+  );
   if (sameGroupItems.length > 0) {
     const leader = sameGroupItems[0];
     newItem.frequency = leader.frequency;
@@ -266,7 +283,9 @@ const calculateTotalNum = (item: PrescriptionItem) => {
     recalcItemPrice(item);
     return;
   }
-  const matched = freqPatterns.find(([re]) => re.test(item.frequency));
+  const matched = freqPatterns.find(([re]) =>
+    re.test(String(item.frequency || ""))
+  );
   const timesPerDay = matched ? matched[1] : 1;
   item.time = timesPerDay;
 
@@ -279,10 +298,16 @@ const calculateTotalNum = (item: PrescriptionItem) => {
   // unit = 小单位，priceUnit = 大单位 → totalNum = total ÷ 整散比
   // unit = priceUnit（相同）→ totalNum = total
   if (conversion > 0) {
-    if (item.unit === item.wholesaleUnit && item.priceUnit === item.prescriptionUnit) {
+    if (
+      item.unit === item.wholesaleUnit &&
+      item.priceUnit === item.prescriptionUnit
+    ) {
       // unit=大，priceUnit=小，乘以整散比
       item.totalNum = Math.ceil(total * conversion);
-    } else if (item.unit === item.prescriptionUnit && item.priceUnit === item.wholesaleUnit) {
+    } else if (
+      item.unit === item.prescriptionUnit &&
+      item.priceUnit === item.wholesaleUnit
+    ) {
       // unit=小，priceUnit=大，除以整散比
       item.totalNum = Math.ceil(total / conversion);
     } else {
@@ -305,12 +330,16 @@ const handleUnitChange = (item: PrescriptionItem) => {
     // 选择小单位，使用散卖价格
     item.price = extractNumber(item.prescriptionPrice);
     item.priceUnit = item.prescriptionUnit;
-    item.priceUnitId = props.unitOptions.find(o => o.name === item.prescriptionUnit)?.id;
+    item.priceUnitId = props.unitOptions.find(
+      o => o.name === item.prescriptionUnit
+    )?.id;
   } else {
     // 选择大单位（包括 wholesaleUnit 或其他单位），使用整卖价格
     item.price = extractNumber(item.wholesalePrice);
     item.priceUnit = item.wholesaleUnit;
-    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
+    item.priceUnitId = props.unitOptions.find(
+      o => o.name === item.wholesaleUnit
+    )?.id;
   }
   // 由 calculateTotalNum 统一处理换算逻辑
   calculateTotalNum(item);
@@ -332,6 +361,35 @@ const handlePriceUnitChange = (item: PrescriptionItem) => {
   calculateTotalNum(item);
 };
 
+// 根据用法ID获取用法名称
+const getUsageName = (useWayId?: number | string): string => {
+  if (!useWayId) return "";
+  const id = typeof useWayId === "string" ? Number(useWayId) : useWayId;
+  return props.usageOptions.find(o => o.id === id)?.name ?? "";
+};
+
+// 根据频率ID获取频率名称
+const getFrequencyName = (frequencyId?: number | string): string => {
+  if (!frequencyId) return "";
+  const id =
+    typeof frequencyId === "string" ? Number(frequencyId) : frequencyId;
+  return props.frequencyOptions.find(o => o.id === id)?.name ?? "";
+};
+
+// 根据用法名称获取用法ID
+const getUsageId = (useWayName?: string): number | undefined => {
+  if (!useWayName) return undefined;
+  const opt = props.usageOptions.find(o => o.name === useWayName);
+  return opt?.id;
+};
+
+// 根据频率名称获取频率ID
+const getFrequencyId = (frequencyName?: string): number | undefined => {
+  if (!frequencyName) return undefined;
+  const opt = props.frequencyOptions.find(o => o.name === frequencyName);
+  return opt?.id;
+};
+
 const getItemPriceUnit = (item: PrescriptionItem): string => {
   const ret = item.priceUnit || item.unit || "";
   return ret ? "/" + ret : "";
@@ -342,11 +400,15 @@ const getItemUnitOptions = (item: PrescriptionItem) => {
   // 如果同时设置了大单位和小单位，则只填充大单位和小单位
   if (item.wholesaleUnit && item.prescriptionUnit) {
     const options: BQMedicalDictionaryEntityType[] = [];
-    const wholesaleOpt = props.unitOptions.find(o => o.name === item.wholesaleUnit);
+    const wholesaleOpt = props.unitOptions.find(
+      o => o.name === item.wholesaleUnit
+    );
     if (wholesaleOpt) options.push({ ...wholesaleOpt });
     // 只有不同时才加入小单位
     if (item.prescriptionUnit !== item.wholesaleUnit) {
-      const prescriptionOpt = props.unitOptions.find(o => o.name === item.prescriptionUnit);
+      const prescriptionOpt = props.unitOptions.find(
+        o => o.name === item.prescriptionUnit
+      );
       if (prescriptionOpt) options.push({ ...prescriptionOpt });
     }
     return options;
@@ -360,11 +422,15 @@ const getItemPriceUnitOptions = (item: PrescriptionItem) => {
   // 如果同时设置了大单位和小单位，则只填充大单位和小单位
   if (item.wholesaleUnit && item.prescriptionUnit) {
     const options: BQMedicalDictionaryEntityType[] = [];
-    const wholesaleOpt = props.unitOptions.find(o => o.name === item.wholesaleUnit);
+    const wholesaleOpt = props.unitOptions.find(
+      o => o.name === item.wholesaleUnit
+    );
     if (wholesaleOpt) options.push({ ...wholesaleOpt });
     // 只有不同时才加入小单位
     if (item.prescriptionUnit !== item.wholesaleUnit) {
-      const prescriptionOpt = props.unitOptions.find(o => o.name === item.prescriptionUnit);
+      const prescriptionOpt = props.unitOptions.find(
+        o => o.name === item.prescriptionUnit
+      );
       if (prescriptionOpt) options.push({ ...prescriptionOpt });
     }
     return options;
@@ -500,13 +566,15 @@ const removeGroup = (index: number) => {
               placeholder="用法"
               clearable
               :disabled="!isGroupFirstRow(item)"
-              @change="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
+              @change="
+                isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null
+              "
             >
               <el-option
                 v-for="opt in props.usageOptions"
                 :key="opt.id"
                 :label="opt.name"
-                :value="opt.name"
+                :value="String(opt.id)"
               />
             </el-select>
           </div>
@@ -518,13 +586,15 @@ const removeGroup = (index: number) => {
               placeholder="频率"
               clearable
               :disabled="!isGroupFirstRow(item)"
-              @change="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
+              @change="
+                isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null
+              "
             >
               <el-option
                 v-for="opt in props.frequencyOptions"
                 :key="opt.id"
                 :label="opt.name"
-                :value="opt.name"
+                :value="String(opt.id)"
               />
             </el-select>
           </div>
@@ -536,7 +606,9 @@ const removeGroup = (index: number) => {
               :min="1"
               :disabled="!isGroupFirstRow(item)"
               style="width: 100%"
-              @input="isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null"
+              @input="
+                isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null
+              "
             />
           </div>
           <div class="col-total">
@@ -722,7 +794,7 @@ const removeGroup = (index: number) => {
       }
 
       .col-days {
-        width: 40px;
+        width: 50px;
         flex-shrink: 0;
 
         input[type="number"]::-webkit-outer-spin-button,

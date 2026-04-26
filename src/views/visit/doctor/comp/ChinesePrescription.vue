@@ -169,6 +169,15 @@ const recalcItemTotalNum = (item: PrescriptionItem) => {
   recalcItemPrice(item);
 };
 
+const resolveDecoWayId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  // 已经是 ID 字符串（纯数字），直接返回
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  // 否则按名称查 ID
+  const opt = props.decoOptions.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
 const handleAddDrug = (medicine: MedicineItem) => {
   if (!currentGroup.value) return;
 
@@ -228,7 +237,7 @@ const handleAddDrug = (medicine: MedicineItem) => {
     wholesalePrice: medicine.wholesalePrice, //整卖价格
     wholesaleUnit: medicine.wholesaleUnit, //整卖单位
     conversionValue: medicine.conversionValue, //整散比
-    decoWay: medicine.decoWay, //煎药方式
+    decoWay: resolveDecoWayId(medicine.decoWay), //煎药方式（转为字典ID字符串）
     groupNo: getNextGroupNo()
   });
   recalcItemTotalNum(currentGroup.value.items[currentGroup.value.items.length - 1]);
@@ -505,7 +514,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
                 v-for="opt in props.decoOptions"
                 :key="opt.id"
                 :label="opt.name"
-                :value="opt.id"
+                :value="String(opt.id)"
               />
             </el-select>
           </div>

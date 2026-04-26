@@ -478,13 +478,13 @@ const onHistoryPrescriptionConfirm = (
     if (typeData.groups.length > 0) {
       const currentGroup = typeData.groups[typeData.currentGroup];
       currentGroup.items = convertedItems;
-      currentGroup.prescId = prescription.id;
+      currentGroup.prescId = undefined;
     } else {
       const groupName = typeKey === "western" || typeKey === "chinese" ? "处方" : "项目";
       typeData.groups.push({
         name: `${groupName}1`,
         prescType: prescription.prescType as number,
-        prescId: prescription.id,
+        prescId: undefined,
         items: convertedItems
       });
     }
@@ -627,6 +627,56 @@ const calcTemplateTotalNum = (item: PrescriptionItem) => {
   item.totalPrice = parseFloat(((item.price || 0) * (item.totalNum || 0)).toFixed(2));
 };
 
+// 名称↔ID 双向转换工具（兼容存量数据，纯数字字符串视为 ID）
+const resolveDecoWayId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = decoOptions.value.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
+const resolveUsageWayId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = usageOptions.value.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
+// 主表 usageType/frequence 是 number，但兼容意外传入名称字符串的情况
+const resolveUsageWayToNumber = (nameOrId?: string | number): number | undefined => {
+  if (nameOrId == null) return undefined;
+  if (typeof nameOrId === 'number') return nameOrId;
+  if (/^\d+$/.test(nameOrId)) return Number(nameOrId);
+  return usageOptions.value.find(o => o.name === nameOrId)?.id;
+};
+
+const resolveFrequencyId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = frequencyOptions.value.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
+const resolveFrequencyToNumber = (nameOrId?: string | number): number | undefined => {
+  if (nameOrId == null) return undefined;
+  if (typeof nameOrId === 'number') return nameOrId;
+  if (/^\d+$/.test(nameOrId)) return Number(nameOrId);
+  return frequencyOptions.value.find(o => o.name === nameOrId)?.id;
+};
+
+// useWay/frequency：药库现在存 ID，处方明细需要名称，转换回来
+const resolveUsageWayName = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (!/^\d+$/.test(nameOrId)) return nameOrId;
+  return usageOptions.value.find(o => String(o.id) === nameOrId)?.name;
+};
+
+const resolveFrequencyName = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (!/^\d+$/.test(nameOrId)) return nameOrId;
+  return frequencyOptions.value.find(o => String(o.id) === nameOrId)?.name;
+};
+
 // 补全处方模板数据：以药库为准
 const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
   console.log("supplementDrugInfoFromTemplate called, items:", JSON.stringify(items, null, 2));
@@ -647,14 +697,14 @@ const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
     if (drug.name) item.itemName = drug.name;
     if (drug.specification) item.spec = drug.specification;
     if (drug.unitId) item.unitId = drug.unitId;
-    if (drug.useWay) item.useWay = drug.useWay;
-    if (drug.frequency) item.frequency = drug.frequency;
+    if (drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
+    if (drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
     if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
     if (drug.prescriptionUnit) item.prescriptionUnit = drug.prescriptionUnit;
     if (drug.wholesalePrice) item.wholesalePrice = drug.wholesalePrice;
     if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
     if (drug.conversionValue) item.conversionValue = drug.conversionValue;
-    if (drug.decoWay) item.decoWay = drug.decoWay;
+    if (drug.decoWay) item.decoWay = resolveDecoWayId(drug.decoWay);
     if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
 
     // 根据 defaultSaleType 设置默认单位和单价：0整卖用药库大单位，1散卖用药库小单位
@@ -725,8 +775,8 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
     if (skipIfHasValue) {
       if (!item.itemName && drug.name) item.itemName = drug.name;
       if (!item.spec && drug.specification) item.spec = drug.specification;
-      if (!item.useWay && drug.useWay) item.useWay = drug.useWay;
-      if (!item.frequency && drug.frequency) item.frequency = drug.frequency;
+      if (!item.useWay && drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
+      if (!item.frequency && drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
       if (!item.prescriptionPrice && drug.prescriptionPrice) {
         item.prescriptionPrice = drug.prescriptionPrice;
       }
@@ -743,7 +793,7 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
         item.conversionValue = drug.conversionValue;
       }
       if (!item.decoWay && drug.decoWay) {
-        item.decoWay = drug.decoWay;
+        item.decoWay = resolveDecoWayId(drug.decoWay);
       }
       if (item.defaultSaleType === undefined && drug.defaultSaleType !== undefined) {
         item.defaultSaleType = drug.defaultSaleType;
@@ -752,14 +802,14 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
       // 完全覆盖模式
       if (drug.name) item.itemName = drug.name;
       if (drug.specification) item.spec = drug.specification;
-      if (drug.useWay) item.useWay = drug.useWay;
-      if (drug.frequency) item.frequency = drug.frequency;
+      if (drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
+      if (drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
       if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
       if (drug.prescriptionUnit) item.prescriptionUnit = drug.prescriptionUnit;
       if (drug.wholesalePrice) item.wholesalePrice = drug.wholesalePrice;
       if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
       if (drug.conversionValue) item.conversionValue = drug.conversionValue;
-      if (drug.decoWay) item.decoWay = drug.decoWay;
+      if (drug.decoWay) item.decoWay = resolveDecoWayId(drug.decoWay);
       if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
     }
 
@@ -1082,12 +1132,12 @@ const collectPrescriptionGroups = (): {
         prescType: group.prescType,
         groupNo: group.name,
         totalPrice: group.items.reduce((s, i) => s + (i.totalPrice || 0), 0),
-        usageType: group.usageType,
-        frequence: group.frequence,
+        usageType: resolveUsageWayToNumber(group.usageType),
+        frequence: resolveFrequencyToNumber(group.frequence),
         doseAmount: group.doseAmount,
         days: group.days,
         recommendation: group.recommendation,
-        decoWay: group.decoWay,
+        decoWay: resolveDecoWayId(group.decoWay),
         items: group.items.map(item => ({
           itemType: item.itemType,
           itemId: item.itemId,
@@ -1098,15 +1148,15 @@ const collectPrescriptionGroups = (): {
           priceUnit: item.priceUnit,
           priceUnitId: item.priceUnitId,
           singleDosage: item.singleDosage,
-          useWay: item.useWay,
-          frequency: item.frequency,
+          useWay: resolveUsageWayId(item.useWay),
+          frequency: resolveFrequencyId(item.frequency),
           days: item.days,
           totalNum: item.totalNum,
           entrust: item.entrust,
           price: item.price,
           totalPrice: item.totalPrice,
           groupNo: item.groupNo,
-          decoWay: item.decoWay
+          decoWay: resolveDecoWayId(item.decoWay)
         }))
       });
     });
@@ -1779,7 +1829,9 @@ watch(
             >
               <div class="col-disease">
                 {{ diag.diagnosisName }}
-                <span class="diag-code">{{ diag.diagnosisCode || "" }}</span>
+                <span v-show="false" class="diag-code">{{
+                  diag.diagnosisCode || ""
+                }}</span>
               </div>
               <div class="col-action">
                 <el-button

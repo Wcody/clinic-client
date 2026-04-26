@@ -9,8 +9,8 @@ export type PrescriptionItem = {
   priceUnit?: string;
   priceUnitId?: number;
   singleDosage: string;
-  useWay: string;
-  frequency: string;
+  useWay?: number | string; // 用法ID或名称
+  frequency?: number | string; // 频率ID或名称
   time: number;
   days: number;
   totalNum: number;
@@ -36,7 +36,9 @@ export type PrescriptionGroup = {
   usageType?: number;
   frequence?: number;
   doseAmount?: number;
+  days?: number;
   recommendation?: string;
+  decoWay?: string;
 };
 
 export type PrescriptionTypeData = {
