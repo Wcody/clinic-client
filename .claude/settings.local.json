@@ -39,7 +39,8 @@
       "Bash(where code *)",
       "Bash(\"/c/Users/Wcke/AppData/Local/Programs/Microsoft VS Code/code\" \"d:/Wcke/000SourceCode/IDEAProjects/Clinic-Client/src/components/BqMedicineSelector/src/MedicineSelector.vue\")",
       "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(grep -E \"\\\\.\\(vue|ts|js\\)$\")"
     ],
     "additionalDirectories": [
       "d:\\Wcke\\000SourceCode\\IDEAProjects\\Clinic-Client\\src\\views\\visit\\doctor",

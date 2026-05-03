@@ -54,6 +54,7 @@
           class="bq-ds-table"
           :current-row-key="activeRowKey"
           row-key="id"
+          @mousedown="handleTableMouseDown"
           @row-click="handleSelect"
         >
           <el-table-column prop="id" label="ID" width="90" />
@@ -180,6 +181,9 @@ const jumpInput = ref<number>(1);
 const dropdownStyle = ref<Record<string, string>>({});
 const activeIndex = ref(-1);
 const shouldIgnoreClickOutside = ref(false);
+const isDragging = ref(false);
+const dragOffset = ref({ x: 0, y: 0 });
+const customPosition = ref<{ top: number; left: number } | null>(null);
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -263,6 +267,14 @@ const visiblePages = computed<number[]>(() => {
 // ---- Positioning ----
 function updateDropdownPosition() {
   if (!selectorRef.value) return;
+  if (customPosition.value) {
+    dropdownStyle.value = {
+      ...dropdownStyle.value,
+      left: `${customPosition.value.left}px`,
+      top: `${customPosition.value.top}px`
+    };
+    return;
+  }
   const rect = selectorRef.value.getBoundingClientRect();
   dropdownStyle.value = {
     position: "fixed",
@@ -331,6 +343,7 @@ function openDropdown() {
   visible.value = true;
   activeIndex.value = -1;
   shouldIgnoreClickOutside.value = true;
+  customPosition.value = null;
   // 无关键字时每次打开都拉全量列表（避免上次过滤结果残留）；有关键字时首次打开才拉
   if (!loading.value && (!keyword.value.trim() || rawData.value.length === 0)) {
     fetchDiagnoses(keyword.value.trim());
@@ -346,6 +359,43 @@ function openDropdown() {
 function closeDropdown() {
   visible.value = false;
   activeIndex.value = -1;
+}
+
+function startDrag(e: MouseEvent) {
+  if (!dropdownRef.value) return;
+  isDragging.value = true;
+  const rect = dropdownRef.value.getBoundingClientRect();
+  dragOffset.value = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+  document.addEventListener("mousemove", onDrag);
+  document.addEventListener("mouseup", stopDrag);
+}
+
+function handleTableMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (target.closest(".el-table__header-wrapper")) {
+    startDrag(e);
+  }
+}
+
+function onDrag(e: MouseEvent) {
+  if (!isDragging.value || !dropdownRef.value) return;
+  const newLeft = e.clientX - dragOffset.value.x;
+  const newTop = e.clientY - dragOffset.value.y;
+  dropdownStyle.value = {
+    ...dropdownStyle.value,
+    left: `${newLeft}px`,
+    top: `${newTop}px`
+  };
+  customPosition.value = { top: newTop, left: newLeft };
+}
+
+function stopDrag() {
+  isDragging.value = false;
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 }
 
 function handleTriggerClick(e: MouseEvent) {
@@ -443,6 +493,8 @@ onUnmounted(() => {
   document.removeEventListener("mousedown", handleClickOutside);
   window.removeEventListener("scroll", handleScrollOrResize, true);
   window.removeEventListener("resize", handleScrollOrResize);
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 });
 </script>
 
@@ -537,6 +589,10 @@ onUnmounted(() => {
 /* 表格悬停行 */
 .bq-ds-table :deep(.el-table__row) {
   cursor: pointer;
+}
+
+.bq-ds-table :deep(.el-table__header-wrapper) {
+  cursor: move;
 }
 
 .bq-ds-table :deep(.el-table__row:hover > td) {

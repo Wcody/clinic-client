@@ -73,7 +73,7 @@ const getFrequencyName = (id?: number) => {
               @click="emit('remove', index)"
             />
           </td>
-          <td class="index-cell">{{ index + 1 }}</td>
+          <td class="index-cell">{{ item.groupNo }}</td>
           <td class="name-cell">{{ item.drugName }}</td>
           <td class="dosage-cell">
             <el-input
@@ -105,35 +105,37 @@ const getFrequencyName = (id?: number) => {
           </td>
           <td class="usage-cell">
             <el-select
-              v-model="item.usageType"
+              :model-value="item.usageType != null ? Number(item.usageType) : undefined"
               size="small"
               style="width: 100%"
               clearable
               placeholder="用法"
               :disabled="disabled"
+              @update:model-value="val => item.usageType = val"
             >
               <el-option
                 v-for="opt in usageOptions"
                 :key="opt.id"
                 :label="opt.name"
-                :value="opt.id"
+                :value="Number(opt.id)"
               />
             </el-select>
           </td>
           <td class="frequency-cell">
             <el-select
-              v-model="item.frequence"
+              :model-value="item.frequency != null ? Number(item.frequency) : undefined"
               size="small"
               style="width: 100%"
               clearable
               placeholder="频率"
               :disabled="disabled"
+              @update:model-value="val => item.frequency = val"
             >
               <el-option
                 v-for="opt in frequencyOptions"
                 :key="opt.id"
                 :label="opt.name"
-                :value="opt.id"
+                :value="Number(opt.id)"
               />
             </el-select>
           </td>

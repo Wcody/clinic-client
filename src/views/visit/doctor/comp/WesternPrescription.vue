@@ -15,7 +15,6 @@ import type {
   PrescriptionTypeData
 } from "../prescriptionTypes";
 import { extractNumber } from "@/utils/common";
-import { el } from "element-plus/es/locale/index.mjs";
 
 defineOptions({ name: "WesternPrescription" });
 
@@ -84,58 +83,6 @@ const prescriptionAmount = computed(
     ) ?? 0
 );
 
-// 根据默认值，完善现在处方明细的数据
-const completeItem = (item: PrescriptionItem, medicine: MedicineItem) => {
-  // 有整散比的药品，强制按整卖单位计价（与 calculateTotalNum 换算逻辑对齐）
-  const hasConversion = parseFloat(medicine.conversionValue || "0") > 0;
-  const saleType = Number(medicine.defaultSaleType);
-
-  if (saleType === 0) {
-    // 整卖：用大单位
-    item.price = extractNumber(medicine.wholesalePrice);
-    let uObj = props.unitOptions.find(o => o.name === medicine.wholesaleUnit);
-    if (uObj) {
-      item.priceUnit = uObj.name;
-      item.priceUnitId = uObj.id;
-      item.unit = uObj.name;
-      item.unitId = uObj.id;
-    } else {
-      // 同时也是计量单位
-      uObj = props.unitOptions.find(o => o.id + "" === medicine.wholesaleUnit);
-      if (uObj) {
-        item.priceUnit = uObj.name;
-        item.priceUnitId = uObj.id;
-        item.unit = uObj.name;
-        item.unitId = uObj.id;
-      }
-    }
-  } else {
-    // 散卖：用小单位
-    item.price = extractNumber(medicine.prescriptionPrice);
-    let uObj = props.unitOptions.find(
-      o => o.name === medicine.prescriptionUnit
-    );
-    if (uObj) {
-      item.priceUnit = uObj.name;
-      item.priceUnitId = uObj.id;
-      item.unit = uObj.name;
-      item.unitId = uObj.id;
-    } else {
-      // 同时也是计量单位
-      uObj = props.unitOptions.find(
-        o => o.id + "" === medicine.prescriptionUnit
-      );
-      if (uObj) {
-        item.priceUnit = uObj.name;
-        item.priceUnitId = uObj.id;
-        item.unit = uObj.name;
-        item.unitId = uObj.id;
-      }
-    }
-  }
-
-  console.log("completeItem", item);
-};
 
 const handleAddDrug = (medicine: MedicineItem) => {
   if (!currentGroup.value) return;
@@ -155,51 +102,56 @@ const handleAddDrug = (medicine: MedicineItem) => {
   let resolvedPriceUnit = "";
   let resolvedPriceUnitId: number | undefined = undefined;
 
-  const hasConversion = parseFloat(medicine.conversionValue || "0") > 0;
   const saleType = Number(medicine.defaultSaleType);
 
+  // 单价：根据默认售卖方式
   if (saleType === 0) {
-    // 整卖：用大单位
     resolvedPrice = extractNumber(medicine.wholesalePrice);
-    const uObj = props.unitOptions.find(o => o.name === medicine.wholesaleUnit);
+  } else {
+    resolvedPrice = extractNumber(medicine.prescriptionPrice);
+  }
+
+  // 兼容单位以名称或 ID 字符串存储的情况
+  const findUnit = (nameOrId?: string) => {
+    if (!nameOrId) return undefined;
+    return (
+      props.unitOptions.find(o => o.name === nameOrId) ??
+      props.unitOptions.find(o => String(o.id) === nameOrId)
+    );
+  };
+
+  // 单次用量单位：优先药库 unitId，回退到大单位（兼容 name/id 两种存储方式）
+  if (medicine.unitId) {
+    const uObj = props.unitOptions.find(o => o.id === medicine.unitId);
+    if (uObj) {
+      resolvedUnit = uObj.name;
+      resolvedUnitId = uObj.id;
+    }
+  }
+  if (!resolvedUnit) {
+    const uObj = findUnit(medicine.wholesaleUnit);
+    if (uObj) {
+      resolvedUnit = uObj.name;
+      resolvedUnitId = uObj.id;
+    }
+  }
+
+  if (saleType === 0) {
+    const uObj = findUnit(medicine.wholesaleUnit);
     if (uObj) {
       resolvedPriceUnit = uObj.name;
       resolvedPriceUnitId = uObj.id;
-      resolvedUnit = uObj.name;
-      resolvedUnitId = uObj.id;
-    } else {
-      const uObj2 = props.unitOptions.find(
-        o => o.id + "" === medicine.wholesaleUnit
-      );
-      if (uObj2) {
-        resolvedPriceUnit = uObj2.name;
-        resolvedPriceUnitId = uObj2.id;
-        resolvedUnit = uObj2.name;
-        resolvedUnitId = uObj2.id;
-      }
     }
   } else {
-    // 散卖：用小单位
-    resolvedPrice = extractNumber(medicine.prescriptionPrice);
-    const uObj = props.unitOptions.find(
-      o => o.name === medicine.prescriptionUnit
-    );
+    const uObj = findUnit(medicine.prescriptionUnit);
     if (uObj) {
       resolvedPriceUnit = uObj.name;
       resolvedPriceUnitId = uObj.id;
-      resolvedUnit = uObj.name;
-      resolvedUnitId = uObj.id;
-    } else {
-      const uObj2 = props.unitOptions.find(
-        o => o.id + "" === medicine.prescriptionUnit
-      );
-      if (uObj2) {
-        resolvedPriceUnit = uObj2.name;
-        resolvedPriceUnitId = uObj2.id;
-        resolvedUnit = uObj2.name;
-        resolvedUnitId = uObj2.id;
-      }
     }
+  }
+  if (!resolvedPriceUnit) {
+    resolvedPriceUnit = resolvedUnit;
+    resolvedPriceUnitId = resolvedUnitId;
   }
 
   const newItem: PrescriptionItem = {
@@ -213,10 +165,10 @@ const handleAddDrug = (medicine: MedicineItem) => {
     singleDosage: medicine.singleDosage ?? "", //单次用量
     unit: resolvedUnit, //单次用量单位名称
     unitId: resolvedUnitId, //单次用量单位id
-    useWay: getFrequencyId(medicine.useWay), // 将用法名称转换为ID
+    useWay: getUsageId(medicine.useWay), // 将用法名称转换为ID
     frequency: getFrequencyId(medicine.frequency), // 将频率名称转换为ID
     time: 1,
-    days: 7,
+    days: 0,
     totalNum: 0,
     entrust: "",
     totalPrice: 0,
@@ -283,9 +235,11 @@ const calculateTotalNum = (item: PrescriptionItem) => {
     recalcItemPrice(item);
     return;
   }
-  const matched = freqPatterns.find(([re]) =>
-    re.test(String(item.frequency || ""))
+  const freqOpt = props.frequencyOptions.find(
+    o => String(o.id) === String(item.frequency)
   );
+  const freqName = freqOpt?.name ?? String(item.frequency ?? "");
+  const matched = freqPatterns.find(([re]) => re.test(freqName));
   const timesPerDay = matched ? matched[1] : 1;
   item.time = timesPerDay;
 
@@ -325,23 +279,22 @@ const handleUnitChange = (item: PrescriptionItem) => {
   const opt = props.unitOptions.find(o => o.id === item.unitId);
   item.unit = opt?.name ?? "";
 
-  // 根据选择的单位设置对应的单价和单价单位
-  if (item.unit === item.prescriptionUnit) {
-    // 选择小单位，使用散卖价格
-    item.price = extractNumber(item.prescriptionPrice);
-    item.priceUnit = item.prescriptionUnit;
-    item.priceUnitId = props.unitOptions.find(
-      o => o.name === item.prescriptionUnit
-    )?.id;
-  } else {
-    // 选择大单位（包括 wholesaleUnit 或其他单位），使用整卖价格
+  // 整卖药品：计价单位固定为大单位，不随单次用量单位变化
+  if (Number(item.defaultSaleType) === 0 && item.wholesaleUnit) {
     item.price = extractNumber(item.wholesalePrice);
     item.priceUnit = item.wholesaleUnit;
-    item.priceUnitId = props.unitOptions.find(
-      o => o.name === item.wholesaleUnit
-    )?.id;
+    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
+  } else if (item.unit === item.prescriptionUnit) {
+    // 散卖且选择小单位
+    item.price = extractNumber(item.prescriptionPrice);
+    item.priceUnit = item.prescriptionUnit;
+    item.priceUnitId = props.unitOptions.find(o => o.name === item.prescriptionUnit)?.id;
+  } else {
+    // 散卖且选择大单位
+    item.price = extractNumber(item.wholesalePrice);
+    item.priceUnit = item.wholesaleUnit;
+    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
   }
-  // 由 calculateTotalNum 统一处理换算逻辑
   calculateTotalNum(item);
 };
 
@@ -361,57 +314,36 @@ const handlePriceUnitChange = (item: PrescriptionItem) => {
   calculateTotalNum(item);
 };
 
-// 根据用法ID获取用法名称
-const getUsageName = (useWayId?: number | string): string => {
-  if (!useWayId) return "";
-  const id = typeof useWayId === "string" ? Number(useWayId) : useWayId;
-  return props.usageOptions.find(o => o.id === id)?.name ?? "";
+// 根据用法名称或ID字符串获取用法ID字符串（与下拉框 :value="String(opt.id)" 保持一致）
+const getUsageId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = props.usageOptions.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
 };
 
-// 根据频率ID获取频率名称
-const getFrequencyName = (frequencyId?: number | string): string => {
-  if (!frequencyId) return "";
-  const id =
-    typeof frequencyId === "string" ? Number(frequencyId) : frequencyId;
-  return props.frequencyOptions.find(o => o.id === id)?.name ?? "";
-};
-
-// 根据用法名称获取用法ID
-const getUsageId = (useWayName?: string): number | undefined => {
-  if (!useWayName) return undefined;
-  const opt = props.usageOptions.find(o => o.name === useWayName);
-  return opt?.id;
-};
-
-// 根据频率名称获取频率ID
-const getFrequencyId = (frequencyName?: string): number | undefined => {
-  if (!frequencyName) return undefined;
-  const opt = props.frequencyOptions.find(o => o.name === frequencyName);
-  return opt?.id;
-};
-
-const getItemPriceUnit = (item: PrescriptionItem): string => {
-  const ret = item.priceUnit || item.unit || "";
-  return ret ? "/" + ret : "";
+// 根据频率名称或ID字符串获取频率ID字符串
+const getFrequencyId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = props.frequencyOptions.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
 };
 
 // 获取每个药品的单位选项
 const getItemUnitOptions = (item: PrescriptionItem) => {
-  // 如果同时设置了大单位和小单位，则只填充大单位和小单位
-  if (item.wholesaleUnit && item.prescriptionUnit) {
+  // 如果设置了整散比，则只展示大单位和小单位
+  if (parseFloat(item.conversionValue || "0") > 0) {
     const options: BQMedicalDictionaryEntityType[] = [];
-    const wholesaleOpt = props.unitOptions.find(
-      o => o.name === item.wholesaleUnit
-    );
-    if (wholesaleOpt) options.push({ ...wholesaleOpt });
-    // 只有不同时才加入小单位
-    if (item.prescriptionUnit !== item.wholesaleUnit) {
-      const prescriptionOpt = props.unitOptions.find(
-        o => o.name === item.prescriptionUnit
-      );
+    if (item.wholesaleUnit) {
+      const wholesaleOpt = props.unitOptions.find(o => o.name === item.wholesaleUnit);
+      if (wholesaleOpt) options.push({ ...wholesaleOpt });
+    }
+    if (item.prescriptionUnit && item.prescriptionUnit !== item.wholesaleUnit) {
+      const prescriptionOpt = props.unitOptions.find(o => o.name === item.prescriptionUnit);
       if (prescriptionOpt) options.push({ ...prescriptionOpt });
     }
-    return options;
+    if (options.length > 0) return options;
   }
   // 其它情况填充所有单位
   return props.unitOptions;
@@ -419,21 +351,18 @@ const getItemUnitOptions = (item: PrescriptionItem) => {
 
 // 获取每个药品的计价单位选项
 const getItemPriceUnitOptions = (item: PrescriptionItem) => {
-  // 如果同时设置了大单位和小单位，则只填充大单位和小单位
-  if (item.wholesaleUnit && item.prescriptionUnit) {
+  // 如果设置了整散比，则只展示大单位和小单位
+  if (parseFloat(item.conversionValue || "0") > 0) {
     const options: BQMedicalDictionaryEntityType[] = [];
-    const wholesaleOpt = props.unitOptions.find(
-      o => o.name === item.wholesaleUnit
-    );
-    if (wholesaleOpt) options.push({ ...wholesaleOpt });
-    // 只有不同时才加入小单位
-    if (item.prescriptionUnit !== item.wholesaleUnit) {
-      const prescriptionOpt = props.unitOptions.find(
-        o => o.name === item.prescriptionUnit
-      );
+    if (item.wholesaleUnit) {
+      const wholesaleOpt = props.unitOptions.find(o => o.name === item.wholesaleUnit);
+      if (wholesaleOpt) options.push({ ...wholesaleOpt });
+    }
+    if (item.prescriptionUnit && item.prescriptionUnit !== item.wholesaleUnit) {
+      const prescriptionOpt = props.unitOptions.find(o => o.name === item.prescriptionUnit);
       if (prescriptionOpt) options.push({ ...prescriptionOpt });
     }
-    return options;
+    if (options.length > 0) return options;
   }
   // 其它情况填充所有单位
   return props.unitOptions;

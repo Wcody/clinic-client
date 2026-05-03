@@ -25,6 +25,7 @@ export type PrescriptionItem = {
   decoWay?: string; //煎药方式
   defaultSaleType?: number; //默认售卖方式: 0整卖 1散卖
   groupNo?: number; //组号，用于同组行排序
+  sort?: number; //保存顺序值，查询时按 sort, id 排序
 };
 
 export type PrescriptionGroup = {

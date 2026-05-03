@@ -43,8 +43,16 @@ import {
   RegistrationStatus,
   FeeStatus
 } from "@/api/visit/register";
-import type { BQMedicalRecordTemplateEntityType } from "@/api/cm/medicalRecordTemplate";
-import type { BQPrescriptionTemplateDetailEntityType, BQPrescriptionTemplateEntityType } from "@/api/cm/prescriptionTemplate";
+import {
+  addMedicalRecordTemplateApi,
+  type BQMedicalRecordTemplateEntityType
+} from "@/api/cm/medicalRecordTemplate";
+import {
+  addPrescriptionTemplateApi,
+  addPrescriptionTemplateDetailBatchApi,
+  type BQPrescriptionTemplateDetailEntityType,
+  type BQPrescriptionTemplateEntityType
+} from "@/api/cm/prescriptionTemplate";
 import { getDrugsByIdsApi } from "@/api/pharmacy/drug";
 import { ElMessage, ElMessageBox } from "element-plus";
 import HistoryMedicalRecord from "./comp/HistoryMedicalRecord.vue";
@@ -191,11 +199,11 @@ const onBeforePatientSelect = async (user: any) => {
     // 确认之前先获取当前患者ID
     const currentPatientId = basicInfoRef.value?.form?.id;
     try {
-      await ElMessageBox.confirm(
-        "当前已有正在接诊的患者，是否切换？",
-        "提示",
-        { confirmButtonText: "确认", cancelButtonText: "取消", type: "warning" }
-      );
+      await ElMessageBox.confirm("当前已有正在接诊的患者，是否切换？", "提示", {
+        confirmButtonText: "确认",
+        cancelButtonText: "取消",
+        type: "warning"
+      });
       // 确认后，保存当前状态到缓存
       saveClinicCache(currentRegId.value, currentPatientId);
       // 重置状态
@@ -257,17 +265,22 @@ const onReset = () => {
   medicalRecordForm.treatmentAdvice = "";
   // 重置处方数据
   Object.values(medicalOrderForm.prescriptionData).forEach(typeData => {
-    typeData.groups = [{
-      name: typeData.groups[0]?.name || "处方1",
-      prescType: typeData.groups[0]?.prescType || 1,
-      items: []
-    }];
+    typeData.groups = [
+      {
+        name: typeData.groups[0]?.name || "处方1",
+        prescType: typeData.groups[0]?.prescType || 1,
+        items: []
+      }
+    ];
     typeData.currentGroup = 0;
   });
   // 重置附加费
   medicalOrderForm.additionalFees = [];
   // 清除缓存
   clearClinicCache();
+  // 重置快照（重置后数据为空，保存按钮应禁用）
+  takeMedicalRecordSnapshot();
+  takeMedicalOrderSnapshot();
   // 路由跳转清空URL参数
   router.push("/visit/doctor/clinic");
 };
@@ -345,7 +358,8 @@ const removeDiagnosis = (index: number) => {
 };
 
 // ==================== 历史病历弹窗 ====================
-const historyMedicalRecordRef = ref<InstanceType<typeof HistoryMedicalRecord>>();
+const historyMedicalRecordRef =
+  ref<InstanceType<typeof HistoryMedicalRecord>>();
 
 const handleViewHistory = () => {
   if (!basicInfoRef.value?.form.id) {
@@ -364,8 +378,10 @@ const onHistoryMedicalRecordConfirm = (record: any) => {
     medicalRecordForm.temperature = record.physicalExam.temperature || "";
     medicalRecordForm.heartRate = record.physicalExam.heartRate || "";
     medicalRecordForm.respiration = record.physicalExam.respiration || "";
-    medicalRecordForm.bloodPressureSystolic = record.physicalExam.bloodPressureSystolic || "";
-    medicalRecordForm.bloodPressureDiastolic = record.physicalExam.bloodPressureDiastolic || "";
+    medicalRecordForm.bloodPressureSystolic =
+      record.physicalExam.bloodPressureSystolic || "";
+    medicalRecordForm.bloodPressureDiastolic =
+      record.physicalExam.bloodPressureDiastolic || "";
     medicalRecordForm.otherExamination = record.physicalExam.other || "";
   }
   // 回填诊断信息
@@ -374,18 +390,21 @@ const onHistoryMedicalRecordConfirm = (record: any) => {
     const codes = record.diagnosisIds
       ? record.diagnosisIds.split(",").filter(Boolean)
       : [];
-    medicalRecordForm.diagnoses = names.map((name: string, index: number) => ({
-      id: codes[index] || "0",
-      diagnosisCode: codes[index] || "",
-      diagnosisName: name,
-      pinyin: "",
-      status: true,
-      version: 0,
-      deleted: false,
-      deletedTime: null,
-      deletedBy: "",
-      createdBy: ""
-    } as BQDiagnosisDictEntityType));
+    medicalRecordForm.diagnoses = names.map(
+      (name: string, index: number) =>
+        ({
+          id: codes[index] || "0",
+          diagnosisCode: codes[index] || "",
+          diagnosisName: name,
+          pinyin: "",
+          status: true,
+          version: 0,
+          deleted: false,
+          deletedTime: null,
+          deletedBy: "",
+          createdBy: ""
+        }) as BQDiagnosisDictEntityType
+    );
     diagnosisCollapsed.value = false;
   }
   ElMessage.success("已从历史病历导入");
@@ -422,26 +441,13 @@ const onHistoryPrescriptionConfirm = (
   medicalOrderForm.prescriptionType = typeKey;
 
   const convertedItems: PrescriptionItem[] = items.map(item => {
-    const saleType = Number(item.defaultSaleType);
-    let resolvedUnit = item.unit || getUnitName(item.unitId);
-    let resolvedUnitId = item.unitId ? Number(item.unitId) : getUnitId(item.unit);
-    let resolvedPrice = Number(item.price ?? 0);
-    let resolvedPriceUnit = item.priceUnit || getUnitName(item.priceUnitId);
-    let resolvedPriceUnitId = item.priceUnitId ? Number(item.priceUnitId) : getUnitId(item.priceUnit);
-
-    if (saleType === 1 && item.prescriptionUnit) {
-      resolvedUnit = item.prescriptionUnit;
-      resolvedUnitId = unitOptions.value.find(o => o.name === item.prescriptionUnit)?.id;
-      resolvedPrice = parseFloat(item.prescriptionPrice || "0") || 0;
-      resolvedPriceUnit = item.prescriptionUnit;
-      resolvedPriceUnitId = resolvedUnitId;
-    } else if (saleType === 0 && item.wholesaleUnit) {
-      resolvedUnit = item.wholesaleUnit;
-      resolvedUnitId = unitOptions.value.find(o => o.name === item.wholesaleUnit)?.id;
-      resolvedPrice = parseFloat(item.wholesalePrice || "0") || 0;
-      resolvedPriceUnit = item.wholesaleUnit;
-      resolvedPriceUnitId = resolvedUnitId;
-    }
+    // 历史数据以原值为准；unitId/priceUnitId 若缺失则通过名称反查
+    const unitObj = item.unitId
+      ? unitOptions.value.find(o => o.id === item.unitId)
+      : findUnitOption(item.unit);
+    const priceUnitObj = item.priceUnitId
+      ? unitOptions.value.find(o => o.id === item.priceUnitId)
+      : findUnitOption(item.priceUnit);
 
     return {
       id: item.id,
@@ -449,10 +455,10 @@ const onHistoryPrescriptionConfirm = (
       itemType: item.itemType ?? 1,
       itemName: item.itemName ?? "",
       spec: item.spec ?? "",
-      unit: resolvedUnit,
-      unitId: resolvedUnitId,
-      priceUnit: resolvedPriceUnit,
-      priceUnitId: resolvedPriceUnitId,
+      unit: unitObj?.name ?? item.unit ?? "",
+      unitId: unitObj?.id,
+      priceUnit: priceUnitObj?.name ?? item.priceUnit ?? "",
+      priceUnitId: priceUnitObj?.id,
       singleDosage: item.singleDosage ?? "",
       useWay: item.useWay ?? "",
       frequency: item.frequency ?? "",
@@ -460,7 +466,7 @@ const onHistoryPrescriptionConfirm = (
       days: item.days ?? 0,
       totalNum: Number(item.totalNum ?? 0),
       entrust: item.entrust ?? "",
-      price: resolvedPrice,
+      price: Number(item.price ?? 0),
       totalPrice: Number(item.totalPrice ?? 0),
       prescriptionPrice: item.prescriptionPrice,
       prescriptionUnit: item.prescriptionUnit,
@@ -469,7 +475,8 @@ const onHistoryPrescriptionConfirm = (
       conversionValue: item.conversionValue,
       decoWay: item.decoWay,
       defaultSaleType: item.defaultSaleType,
-      groupNo: item.groupNo
+      groupNo: item.groupNo,
+      sort: item.sort
     };
   });
 
@@ -478,9 +485,9 @@ const onHistoryPrescriptionConfirm = (
     if (typeData.groups.length > 0) {
       const currentGroup = typeData.groups[typeData.currentGroup];
       currentGroup.items = convertedItems;
-      currentGroup.prescId = undefined;
     } else {
-      const groupName = typeKey === "western" || typeKey === "chinese" ? "处方" : "项目";
+      const groupName =
+        typeKey === "western" || typeKey === "chinese" ? "处方" : "项目";
       typeData.groups.push({
         name: `${groupName}1`,
         prescType: prescription.prescType as number,
@@ -491,8 +498,12 @@ const onHistoryPrescriptionConfirm = (
 
     if (typeKey === "chinese") {
       chinesePrescriptionRef.value?.applyTemplateSettings({
-        usageTypeName: usageOptions.value.find(o => o.id === prescription.usageType)?.name,
-        frequenceName: frequencyOptions.value.find(o => o.id === prescription.frequence)?.name,
+        usageTypeName: usageOptions.value.find(
+          o => o.id === prescription.usageType
+        )?.name,
+        frequenceName: frequencyOptions.value.find(
+          o => o.id === prescription.frequence
+        )?.name,
         doseAmount: prescription.doseAmount,
         days: prescription.days,
         decoWay: prescription.recommendation || "",
@@ -506,17 +517,20 @@ const onHistoryPrescriptionConfirm = (
     // 同时导入诊断信息
     if (importDiagnosis && prescription.diagnosis) {
       const names = prescription.diagnosis.split("，").filter(Boolean);
-      medicalRecordForm.diagnoses = names.map((name) => ({
-        id: "0",
-        diagnosisCode: "",
-        diagnosisName: name,
-        pinyin: "",
-        status: true,
-        deleted: false,
-        deletedTime: null,
-        deletedBy: "",
-        createdBy: ""
-      } as BQDiagnosisDictEntityType));
+      medicalRecordForm.diagnoses = names.map(
+        name =>
+          ({
+            id: "0",
+            diagnosisCode: "",
+            diagnosisName: name,
+            pinyin: "",
+            status: true,
+            deleted: false,
+            deletedTime: null,
+            deletedBy: "",
+            createdBy: ""
+          }) as BQDiagnosisDictEntityType
+      );
       diagnosisCollapsed.value = false;
     }
 
@@ -595,7 +609,9 @@ const calcTemplateTotalNum = (item: PrescriptionItem) => {
     item.totalPrice = 0;
     return;
   }
-  const matched = templateFreqPatterns.find(([re]) => re.test(item.frequency || ""));
+  const matched = templateFreqPatterns.find(([re]) =>
+    re.test(String(item.frequency || ""))
+  );
   const timesPerDay = matched ? matched[1] : 1;
   item.time = timesPerDay;
 
@@ -608,10 +624,16 @@ const calcTemplateTotalNum = (item: PrescriptionItem) => {
   // unit = 小单位，priceUnit = 大单位 → totalNum = total ÷ 整散比
   // unit = priceUnit（相同）→ totalNum = total
   if (conversion > 0) {
-    if (item.unit === item.wholesaleUnit && item.priceUnit === item.prescriptionUnit) {
+    if (
+      item.unit === item.wholesaleUnit &&
+      item.priceUnit === item.prescriptionUnit
+    ) {
       // unit=大，priceUnit=小，乘以整散比
       item.totalNum = Math.ceil(total * conversion);
-    } else if (item.unit === item.prescriptionUnit && item.priceUnit === item.wholesaleUnit) {
+    } else if (
+      item.unit === item.prescriptionUnit &&
+      item.priceUnit === item.wholesaleUnit
+    ) {
       // unit=小，priceUnit=大，除以整散比
       item.totalNum = Math.ceil(total / conversion);
     } else {
@@ -624,7 +646,18 @@ const calcTemplateTotalNum = (item: PrescriptionItem) => {
   }
 
   // 计算总价
-  item.totalPrice = parseFloat(((item.price || 0) * (item.totalNum || 0)).toFixed(2));
+  item.totalPrice = parseFloat(
+    ((item.price || 0) * (item.totalNum || 0)).toFixed(2)
+  );
+};
+
+// 通过名称或 ID 字符串在单位字典中查找选项（兼容两种存储方式）
+const findUnitOption = (nameOrId?: string) => {
+  if (!nameOrId) return undefined;
+  return (
+    unitOptions.value.find(o => o.name === nameOrId) ??
+    unitOptions.value.find(o => String(o.id) === nameOrId)
+  );
 };
 
 // 名称↔ID 双向转换工具（兼容存量数据，纯数字字符串视为 ID）
@@ -643,9 +676,11 @@ const resolveUsageWayId = (nameOrId?: string): string | undefined => {
 };
 
 // 主表 usageType/frequence 是 number，但兼容意外传入名称字符串的情况
-const resolveUsageWayToNumber = (nameOrId?: string | number): number | undefined => {
+const resolveUsageWayToNumber = (
+  nameOrId?: string | number
+): number | undefined => {
   if (nameOrId == null) return undefined;
-  if (typeof nameOrId === 'number') return nameOrId;
+  if (typeof nameOrId === "number") return nameOrId;
   if (/^\d+$/.test(nameOrId)) return Number(nameOrId);
   return usageOptions.value.find(o => o.name === nameOrId)?.id;
 };
@@ -657,9 +692,11 @@ const resolveFrequencyId = (nameOrId?: string): string | undefined => {
   return opt ? String(opt.id) : undefined;
 };
 
-const resolveFrequencyToNumber = (nameOrId?: string | number): number | undefined => {
+const resolveFrequencyToNumber = (
+  nameOrId?: string | number
+): number | undefined => {
   if (nameOrId == null) return undefined;
-  if (typeof nameOrId === 'number') return nameOrId;
+  if (typeof nameOrId === "number") return nameOrId;
   if (/^\d+$/.test(nameOrId)) return Number(nameOrId);
   return frequencyOptions.value.find(o => o.name === nameOrId)?.id;
 };
@@ -679,7 +716,10 @@ const resolveFrequencyName = (nameOrId?: string): string | undefined => {
 
 // 补全处方模板数据：以药库为准
 const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
-  console.log("supplementDrugInfoFromTemplate called, items:", JSON.stringify(items, null, 2));
+  console.log(
+    "supplementDrugInfoFromTemplate called, items:",
+    JSON.stringify(items, null, 2)
+  );
   const drugIds = items.map(item => item.itemId).filter(Boolean) as number[];
   console.log("drugIds:", drugIds);
   if (drugIds.length === 0) return;
@@ -696,7 +736,6 @@ const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
     // 以药库为准
     if (drug.name) item.itemName = drug.name;
     if (drug.specification) item.spec = drug.specification;
-    if (drug.unitId) item.unitId = drug.unitId;
     if (drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
     if (drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
     if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
@@ -705,32 +744,32 @@ const supplementDrugInfoFromTemplate = async (items: PrescriptionItem[]) => {
     if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
     if (drug.conversionValue) item.conversionValue = drug.conversionValue;
     if (drug.decoWay) item.decoWay = resolveDecoWayId(drug.decoWay);
-    if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
+    if (drug.defaultSaleType !== undefined)
+      item.defaultSaleType = drug.defaultSaleType;
 
-    // 根据 defaultSaleType 设置默认单位和单价：0整卖用药库大单位，1散卖用药库小单位
+    // 同步单次用量
+    if (drug.singleDosage) item.singleDosage = drug.singleDosage;
+
+    // 单次用量单位：优先药库 unitId，回退到大单位
     const saleType = Number(drug.defaultSaleType);
-    if (saleType === 1 && drug.prescriptionUnit) {
-      // 散卖：用小单位
-      item.unit = drug.prescriptionUnit;
-      item.unitId = unitOptions.value.find(o => o.name === drug.prescriptionUnit)?.id;
-      item.price = parseFloat(drug.prescriptionPrice || "0") || 0;
-      item.priceUnit = drug.prescriptionUnit;
-      item.priceUnitId = item.unitId;
-    } else if (saleType === 0 && drug.wholesaleUnit) {
-      // 整卖：用大单位
-      item.unit = drug.wholesaleUnit;
-      item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
-      item.price = parseFloat(drug.wholesalePrice || "0") || 0;
-      item.priceUnit = drug.wholesaleUnit;
-      item.priceUnitId = item.unitId;
-    } else if (drug.wholesaleUnit) {
-      // 默认：用大单位
-      item.unit = drug.wholesaleUnit;
-      item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
-      item.price = parseFloat(drug.wholesalePrice || "0") || 0;
-      item.priceUnit = drug.wholesaleUnit;
-      item.priceUnitId = item.unitId;
-    }
+    const unitObj = drug.unitId
+      ? unitOptions.value.find(o => o.id === drug.unitId)
+      : findUnitOption(drug.wholesaleUnit);
+    item.unit = unitObj?.name ?? "";
+    item.unitId = unitObj?.id;
+
+    // 单价：根据 defaultSaleType
+    item.price =
+      saleType === 0
+        ? parseFloat(drug.wholesalePrice || "0") || 0
+        : parseFloat(drug.prescriptionPrice || "0") || 0;
+
+    // 加价总量单位：整卖用大单位，散卖用小单位，回退到单次用量单位
+    const targetUnit =
+      saleType === 0 ? drug.wholesaleUnit : drug.prescriptionUnit;
+    const priceUnitObj = findUnitOption(targetUnit) ?? unitObj;
+    item.priceUnit = priceUnitObj?.name ?? "";
+    item.priceUnitId = priceUnitObj?.id;
 
     // 计算 totalNum 和 totalPrice（考虑频率和大小单位换算）
     calcTemplateTotalNum(item);
@@ -744,7 +783,9 @@ const supplementDrugInfoFromHistory = async (items: PrescriptionItem[]) => {
   console.log("supplementDrugInfoFromHistory drugIds:", drugIds);
 
   // 同时收集药品名称，用于没有 drugId 时通过名称查找
-  const drugNames = items.map(item => item.itemName).filter(Boolean) as string[];
+  const drugNames = items
+    .map(item => item.itemName)
+    .filter(Boolean) as string[];
 
   if (drugIds.length === 0 && drugNames.length === 0) return;
 
@@ -753,20 +794,27 @@ const supplementDrugInfoFromHistory = async (items: PrescriptionItem[]) => {
     const drugRes = await getDrugsByIdsApi(drugIds);
     console.log("supplementDrugInfoFromHistory drugRes:", drugRes);
     if (drugRes?.data) {
-      const drugMap = new Map(drugRes.data.map((d: any) => [d.id, d]));
+      const drugMap = new Map(drugRes.data.map((d: any) => [Number(d.id), d]));
       applyDrugInfo(items, drugMap, true);
     }
   }
 
   // 如果有名称但没有查到对应药品，用名称再查一次
-  if (drugNames.length > 0 && items.some(item => !item.itemId || !item.wholesaleUnit)) {
+  if (
+    drugNames.length > 0 &&
+    items.some(item => !item.itemId || !item.wholesaleUnit)
+  ) {
     // 这里可以调用按名称查询药品的接口
     // 目前暂时跳过，等待后端补充 itemId
   }
 };
 
 // 应用药品信息到 items（历史数据模式：以当前数据为准，药库补充缺失值）
-const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, skipIfHasValue: boolean) => {
+const applyDrugInfo = (
+  items: PrescriptionItem[],
+  drugMap: Map<number, any>,
+  skipIfHasValue: boolean
+) => {
   items.forEach(item => {
     const drug = item.itemId ? drugMap.get(item.itemId) : undefined;
     if (!drug) return;
@@ -775,8 +823,10 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
     if (skipIfHasValue) {
       if (!item.itemName && drug.name) item.itemName = drug.name;
       if (!item.spec && drug.specification) item.spec = drug.specification;
-      if (!item.useWay && drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
-      if (!item.frequency && drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
+      if (!item.useWay && drug.useWay)
+        item.useWay = resolveUsageWayName(drug.useWay);
+      if (!item.frequency && drug.frequency)
+        item.frequency = resolveFrequencyName(drug.frequency);
       if (!item.prescriptionPrice && drug.prescriptionPrice) {
         item.prescriptionPrice = drug.prescriptionPrice;
       }
@@ -795,7 +845,10 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
       if (!item.decoWay && drug.decoWay) {
         item.decoWay = resolveDecoWayId(drug.decoWay);
       }
-      if (item.defaultSaleType === undefined && drug.defaultSaleType !== undefined) {
+      if (
+        item.defaultSaleType === undefined &&
+        drug.defaultSaleType !== undefined
+      ) {
         item.defaultSaleType = drug.defaultSaleType;
       }
     } else {
@@ -804,37 +857,60 @@ const applyDrugInfo = (items: PrescriptionItem[], drugMap: Map<number, any>, ski
       if (drug.specification) item.spec = drug.specification;
       if (drug.useWay) item.useWay = resolveUsageWayName(drug.useWay);
       if (drug.frequency) item.frequency = resolveFrequencyName(drug.frequency);
-      if (drug.prescriptionPrice) item.prescriptionPrice = drug.prescriptionPrice;
+      if (drug.prescriptionPrice)
+        item.prescriptionPrice = drug.prescriptionPrice;
       if (drug.prescriptionUnit) item.prescriptionUnit = drug.prescriptionUnit;
       if (drug.wholesalePrice) item.wholesalePrice = drug.wholesalePrice;
       if (drug.wholesaleUnit) item.wholesaleUnit = drug.wholesaleUnit;
       if (drug.conversionValue) item.conversionValue = drug.conversionValue;
       if (drug.decoWay) item.decoWay = resolveDecoWayId(drug.decoWay);
-      if (drug.defaultSaleType !== undefined) item.defaultSaleType = drug.defaultSaleType;
+      if (drug.defaultSaleType !== undefined)
+        item.defaultSaleType = drug.defaultSaleType;
     }
 
-    // 单位填充：根据 defaultSaleType 决定用大单位还是小单位
+    // 单次用量单位：有 unit 名称但无 unitId 时通过名称反查；都没有则从药库补全
+    if (item.unit && !item.unitId) {
+      const uObj = findUnitOption(item.unit);
+      if (uObj) {
+        item.unit = uObj.name ?? "";
+        item.unitId = uObj.id;
+      }
+    }
     if (!item.unit && !item.unitId) {
-      const saleType = Number(drug.defaultSaleType);
-      if (saleType === 1 && drug.prescriptionUnit) {
-        item.unit = drug.prescriptionUnit;
-        item.unitId = unitOptions.value.find(o => o.name === drug.prescriptionUnit)?.id;
-      } else if (drug.wholesaleUnit) {
-        item.unit = drug.wholesaleUnit;
-        item.unitId = unitOptions.value.find(o => o.name === drug.wholesaleUnit)?.id;
+      const uObj = drug.unitId
+        ? unitOptions.value.find(o => o.id === drug.unitId)
+        : findUnitOption(drug.wholesaleUnit);
+      if (uObj) {
+        item.unit = uObj.name ?? "";
+        item.unitId = uObj.id;
       }
     }
 
-    // 单价和计价单位填充
-    if (!item.price && item.price !== 0) {
-      const saleType = Number(drug.defaultSaleType);
-      if (saleType === 1 && drug.prescriptionPrice) {
-        item.price = parseFloat(drug.prescriptionPrice) || 0;
-        item.priceUnit = drug.prescriptionUnit;
-        item.priceUnitId = item.unitId;
-      } else if (drug.wholesalePrice) {
-        item.price = parseFloat(drug.wholesalePrice) || 0;
-        item.priceUnit = drug.wholesaleUnit;
+    // 计价总量单位：有 priceUnit 名称但无 priceUnitId 时反查；都没有则按 defaultSaleType 从药库补全
+    const saleType = Number(drug.defaultSaleType ?? item.defaultSaleType);
+    if (item.priceUnit && !item.priceUnitId) {
+      const uObj = findUnitOption(item.priceUnit);
+      if (uObj) {
+        item.priceUnit = uObj.name ?? "";
+        item.priceUnitId = uObj.id;
+      }
+    }
+    if (!item.priceUnit) {
+      const targetUnit =
+        saleType === 0 ? drug.wholesaleUnit : drug.prescriptionUnit;
+      const uObj = findUnitOption(targetUnit);
+      if (uObj) {
+        item.priceUnit = uObj.name ?? "";
+        item.priceUnitId = uObj.id;
+        if (!item.price) {
+          item.price =
+            saleType === 0
+              ? parseFloat(drug.wholesalePrice || "0") || 0
+              : parseFloat(drug.prescriptionPrice || "0") || 0;
+        }
+      } else {
+        // 回退到单次用量单位
+        item.priceUnit = item.unit;
         item.priceUnitId = item.unitId;
       }
     }
@@ -845,12 +921,17 @@ const onPrescriptionTemplateConfirm = async (
   details: BQPrescriptionTemplateDetailEntityType[],
   templateInfo: BQPrescriptionTemplateEntityType
 ) => {
-  console.log("onPrescriptionTemplateConfirm called, details:", JSON.stringify(details, null, 2));
+  console.log(
+    "onPrescriptionTemplateConfirm called, details:",
+    JSON.stringify(details, null, 2)
+  );
 
   // 检查模板数据中是否有组号
-  const hasGroupNo = details.some(d => d.groupNo !== undefined && d.groupNo !== null);
+  const hasGroupNo = details.some(
+    d => d.groupNo !== undefined && d.groupNo !== null
+  );
 
-  const items: PrescriptionItem[] = details.map((d) => {
+  const items: PrescriptionItem[] = details.map(d => {
     const unitId = d.quantityUnit ?? undefined;
     const price = parseFloat(String(d.price ?? "").replace(/[^\d.]/g, "")) || 0;
     return {
@@ -858,8 +939,8 @@ const onPrescriptionTemplateConfirm = async (
       itemType: 1,
       itemName: d.drugName || "",
       spec: d.specification || "",
-      unitId: unitId ?? getUnitId(d.unit),
-      unit: getUnitName(unitId) || d.unit || "",
+      unitId: unitId,
+      unit: getUnitName(unitId) || "",
       singleDosage: d.singleUsageAmount
         ? String(d.singleUsageAmount)
         : d.quantity
@@ -870,7 +951,7 @@ const onPrescriptionTemplateConfirm = async (
       time: 1,
       days: d.days || 0,
       totalNum: d.quantity || 0,
-      entrust: templateInfo.recommendation || "",
+      entrust: d.recommendation || "",
       price,
       totalPrice: 0,
       decoWay: d.cookingType
@@ -883,7 +964,10 @@ const onPrescriptionTemplateConfirm = async (
   // 补全药品信息
   console.log("Before supplementDrugInfoFromTemplate");
   await supplementDrugInfoFromTemplate(items);
-  console.log("After supplementDrugInfoFromTemplate, items:", JSON.stringify(items, null, 2));
+  console.log(
+    "After supplementDrugInfoFromTemplate, items:",
+    JSON.stringify(items, null, 2)
+  );
 
   const currentData = getCurrentPrescriptionData();
   if (currentData.groups[currentData.currentGroup]) {
@@ -893,10 +977,15 @@ const onPrescriptionTemplateConfirm = async (
   // 中药处方需要带入用法/频率/剂数
   if (medicalOrderForm.prescriptionType === "chinese") {
     chinesePrescriptionRef.value?.applyTemplateSettings({
-      usageTypeName: usageOptions.value.find(o => o.id === templateInfo.usageType)?.name,
-      frequenceName: frequencyOptions.value.find(o => o.id === templateInfo.frequence)?.name,
+      usageTypeName: usageOptions.value.find(
+        o => o.id === templateInfo.usageType
+      )?.name,
+      frequenceName: frequencyOptions.value.find(
+        o => o.id === templateInfo.frequence
+      )?.name,
       doseAmount: templateInfo.doseAmount,
-      decoWay: templateInfo.recommendation || ""
+      days: templateInfo.days,
+      recommendation: templateInfo.recommendation || ""
     });
   }
 };
@@ -1054,6 +1143,78 @@ const getTotalAmount = () => {
   return feeTotal + prescTotal;
 };
 
+// ==================== 脏数据检测 ====================
+const medicalRecordSnapshot = ref("");
+const medicalOrderSnapshot = ref("");
+
+const getMedicalRecordState = () =>
+  JSON.stringify({
+    chiefComplaint: medicalRecordForm.chiefComplaint,
+    presentIllness: medicalRecordForm.presentIllness,
+    pastHistory: medicalRecordForm.pastHistory,
+    allergyHistory: medicalRecordForm.allergyHistory,
+    allergyDetail: medicalRecordForm.allergyDetail,
+    personalHistory: medicalRecordForm.personalHistory,
+    marriageHistory: medicalRecordForm.marriageHistory,
+    familyHistory: medicalRecordForm.familyHistory,
+    travelHistory: medicalRecordForm.travelHistory,
+    contactHistory: medicalRecordForm.contactHistory,
+    temperature: medicalRecordForm.temperature,
+    heartRate: medicalRecordForm.heartRate,
+    respiration: medicalRecordForm.respiration,
+    bloodPressureSystolic: medicalRecordForm.bloodPressureSystolic,
+    bloodPressureDiastolic: medicalRecordForm.bloodPressureDiastolic,
+    otherExamination: medicalRecordForm.otherExamination,
+    diagnoses: medicalRecordForm.diagnoses.map(d => d.diagnosisName),
+    treatmentAdvice: medicalRecordForm.treatmentAdvice
+  });
+
+const getMedicalOrderState = () =>
+  JSON.stringify({
+    prescriptions: Object.fromEntries(
+      Object.entries(medicalOrderForm.prescriptionData).map(([k, v]) => [
+        k,
+        v.groups.map(g => ({
+          prescId: g.prescId,
+          prescType: g.prescType,
+          items: g.items.map(i => ({
+            itemId: i.itemId,
+            itemName: i.itemName,
+            singleDosage: i.singleDosage,
+            useWay: i.useWay,
+            frequency: i.frequency,
+            days: i.days,
+            totalNum: i.totalNum,
+            price: i.price,
+            entrust: i.entrust,
+            groupNo: i.groupNo,
+            decoWay: i.decoWay
+          }))
+        }))
+      ])
+    ),
+    additionalFees: medicalOrderForm.additionalFees.map(f => ({
+      id: f.id,
+      amount: f.amount
+    }))
+  });
+
+const takeMedicalRecordSnapshot = () => {
+  medicalRecordSnapshot.value = getMedicalRecordState();
+};
+
+const takeMedicalOrderSnapshot = () => {
+  medicalOrderSnapshot.value = getMedicalOrderState();
+};
+
+const medicalRecordDirty = computed(
+  () => getMedicalRecordState() !== medicalRecordSnapshot.value
+);
+
+const medicalOrderDirty = computed(
+  () => getMedicalOrderState() !== medicalOrderSnapshot.value
+);
+
 // ==================== 保存病历 ====================
 const saveMedicalRecord = async (): Promise<number | undefined> => {
   const form = basicInfoRef.value?.form;
@@ -1148,8 +1309,12 @@ const collectPrescriptionGroups = (): {
           priceUnit: item.priceUnit,
           priceUnitId: item.priceUnitId,
           singleDosage: item.singleDosage,
-          useWay: resolveUsageWayId(item.useWay),
-          frequency: resolveFrequencyId(item.frequency),
+          useWay: resolveUsageWayId(
+            item.useWay != null ? String(item.useWay) : undefined
+          ),
+          frequency: resolveFrequencyId(
+            item.frequency != null ? String(item.frequency) : undefined
+          ),
           days: item.days,
           totalNum: item.totalNum,
           entrust: item.entrust,
@@ -1226,7 +1391,7 @@ const handlePrescriptionTabClick = () => {
   // 1秒内点击3次且保存按钮不显示时，强制显示保存按钮
   if (recentClicks.length >= 3 && !canShowSaveBtn.value) {
     forceShowSaveBtn.value = true;
-    ElMessage.warning('进入测试模式');
+    ElMessage.warning("进入测试模式");
   }
 };
 
@@ -1252,6 +1417,7 @@ const handleSave = async () => {
     const ids = await ensurePatientAndRegistration();
     if (!ids) return;
     await saveMedicalRecord();
+    takeMedicalRecordSnapshot();
     ElMessage.success("保存成功");
   } catch {
     ElMessage.error("保存失败");
@@ -1273,7 +1439,11 @@ const handleSaveMedicalOrder = async () => {
     const ids = await ensurePatientAndRegistration();
     if (!ids) return;
 
-    await saveMedicalRecord();
+    // 病历有未保存的修改时，先保存病历
+    if (medicalRecordDirty.value) {
+      await saveMedicalRecord();
+      takeMedicalRecordSnapshot();
+    }
 
     const res = await saveMedicalOrderApi({
       patientId: ids.patientId,
@@ -1283,6 +1453,7 @@ const handleSaveMedicalOrder = async () => {
     });
     if (res?.data) {
       applyMedicalOrderResult(res.data, groupRefs);
+      takeMedicalOrderSnapshot();
       ElMessage.success("保存成功");
     }
   } catch {
@@ -1294,8 +1465,72 @@ const handlePrint = () => {
   ElMessage.info("打印病历");
 };
 
-const handleSaveAsTemplate = () => {
-  ElMessage.info("另存为病历模板");
+const handleSaveAsTemplate = async () => {
+  const form = medicalRecordForm;
+  const isEmpty =
+    !form.chiefComplaint?.trim() &&
+    !form.presentIllness?.trim() &&
+    !form.pastHistory?.trim() &&
+    !form.personalHistory?.trim() &&
+    !form.marriageHistory?.trim() &&
+    !form.familyHistory?.trim() &&
+    !form.travelHistory?.trim() &&
+    !form.contactHistory?.trim() &&
+    !form.temperature?.trim() &&
+    !form.heartRate?.trim() &&
+    !form.respiration?.trim() &&
+    !form.bloodPressureSystolic?.trim() &&
+    !form.bloodPressureDiastolic?.trim() &&
+    !form.otherExamination?.trim() &&
+    !form.treatmentAdvice?.trim() &&
+    form.diagnoses.length === 0;
+
+  if (isEmpty) {
+    ElMessage.warning("不允许创建空模板");
+    return;
+  }
+
+  try {
+    const { value: name } = await ElMessageBox.prompt(
+      "请输入病历模板名称",
+      "另存为病历模板",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        inputPattern: /\S/,
+        inputErrorMessage: "模板名称不能为空"
+      }
+    );
+    if (!name?.trim()) return;
+
+    await addMedicalRecordTemplateApi({
+      name: name.trim(),
+      complaint: form.chiefComplaint,
+      historyOfPresentIllness: form.presentIllness,
+      pastHistory: form.pastHistory,
+      personalHistory: form.personalHistory,
+      obstericalHistory: form.marriageHistory,
+      familyHistory: form.familyHistory,
+      bodyTemperature: form.temperature
+        ? parseFloat(form.temperature)
+        : undefined,
+      heartRate: form.heartRate ? parseFloat(form.heartRate) : undefined,
+      breathRate: form.respiration ? parseFloat(form.respiration) : undefined,
+      bloodPressureHight: form.bloodPressureSystolic
+        ? parseFloat(form.bloodPressureSystolic)
+        : undefined,
+      bloodPressureLow: form.bloodPressureDiastolic
+        ? parseFloat(form.bloodPressureDiastolic)
+        : undefined,
+      otherExamine: form.otherExamination,
+      treatmentRecommendation: form.treatmentAdvice,
+      status: true
+    });
+    ElMessage.success("病历模板保存成功");
+  } catch (err: any) {
+    if (err === "cancel" || err?.action === "cancel") return;
+    ElMessage.error("保存病历模板失败");
+  }
 };
 
 const handleSubmit = async () => {
@@ -1321,6 +1556,8 @@ const handleSubmit = async () => {
     if (res?.data) {
       applyMedicalOrderResult(res.data, groupRefs);
     }
+    takeMedicalRecordSnapshot();
+    takeMedicalOrderSnapshot();
     await syncPatientInfo();
     ElMessage.success("提交成功");
   } catch {
@@ -1385,8 +1622,87 @@ const handlePrintCommand = (command: string) => {
   handlePrintPrescription(showPrice, printCurrent, prescType);
 };
 
-const handleSaveAsPrescriptionTemplate = () => {
-  ElMessage.info("另存为处方模板");
+const handleSaveAsPrescriptionTemplate = async () => {
+  const typeData = getCurrentPrescriptionData();
+  const currentGroup = typeData.groups[typeData.currentGroup];
+
+  if (!currentGroup || currentGroup.items.length === 0) {
+    ElMessage.warning("不允许创建空模板");
+    return;
+  }
+
+  try {
+    const { value: name } = await ElMessageBox.prompt(
+      "请输入处方模板名称",
+      "另存为处方模板",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        inputPattern: /\S/,
+        inputErrorMessage: "模板名称不能为空"
+      }
+    );
+    if (!name?.trim()) return;
+
+    const prescType = currentGroup.prescType;
+
+    // 中药：先将 batch 状态刷入 group，确保 usageType/frequence/recommendation 最新
+    if (prescType === 2) {
+      chinesePrescriptionRef.value?.applyBatchToItems?.();
+    }
+
+    const templatePayload: BQPrescriptionTemplateEntityType = {
+      name: name.trim(),
+      prescriptionType: prescType,
+      templateType: 1,
+      status: true
+    };
+    if (prescType === 2) {
+      templatePayload.usageType = currentGroup.usageType;
+      templatePayload.frequence = currentGroup.frequence;
+      templatePayload.doseAmount = currentGroup.doseAmount;
+      templatePayload.days = currentGroup.days;
+      templatePayload.recommendation = currentGroup.recommendation;
+    }
+
+    const templateRes = await addPrescriptionTemplateApi(templatePayload);
+    const templateId = templateRes?.data?.id;
+    if (!templateId) {
+      ElMessage.error("保存处方模板失败");
+      return;
+    }
+
+    const details = currentGroup.items.map((item, index) => {
+      const decoWayIdStr = resolveDecoWayId(item.decoWay);
+      return {
+        templateId,
+        drugId: item.itemId,
+        drugName: item.itemName || "",
+        specification: item.spec,
+        quantity: item.totalNum,
+        quantityUnit: item.priceUnitId,
+        singleUsageAmount: item.singleDosage
+          ? parseFloat(item.singleDosage)
+          : undefined,
+        singleUsageUnit: item.unitId,
+        days: item.days,
+        cookingType: decoWayIdStr ? Number(decoWayIdStr) : undefined,
+        usageType: resolveUsageWayToNumber(item.useWay),
+        frequency: resolveFrequencyToNumber(item.frequency),
+        recommendation: item.entrust || undefined,
+        groupNo: item.groupNo,
+        sort: index
+      };
+    });
+
+    await addPrescriptionTemplateDetailBatchApi(
+      details as BQPrescriptionTemplateDetailEntityType[]
+    );
+    ElMessage.success("处方模板保存成功");
+  } catch (err: any) {
+    if (err === "cancel" || err?.action === "cancel") return;
+    ElMessage.error("保存处方模板失败");
+  }
 };
 
 const handleCharge = async () => {
@@ -1487,7 +1803,10 @@ const loadDecoDictionary = async () => {
 };
 
 // ==================== 根据路由参数加载数据 ====================
-const loadFromRoute = async (newRegId?: number | string, newPatientId?: number | string) => {
+const loadFromRoute = async (
+  newRegId?: number | string,
+  newPatientId?: number | string
+) => {
   let loadRegId: number;
   let loadPatientId: number;
 
@@ -1587,18 +1906,21 @@ const loadFromRoute = async (newRegId?: number | string, newPatientId?: number |
           ? record.diagnosisIds.split(",").filter(Boolean)
           : [];
         console.log("回填诊断 - names:", names, "codes:", codes);
-        medicalRecordForm.diagnoses = names.map((name, index) => ({
-          id: codes[index] || "0",
-          diagnosisCode: codes[index] || "",
-          diagnosisName: name,
-          pinyin: "",
-          status: true,
-          version: 0,
-          deleted: false,
-          deletedTime: null,
-          deletedBy: "",
-          createdBy: ""
-        } as BQDiagnosisDictEntityType));
+        medicalRecordForm.diagnoses = names.map(
+          (name, index) =>
+            ({
+              id: codes[index] || "0",
+              diagnosisCode: codes[index] || "",
+              diagnosisName: name,
+              pinyin: "",
+              status: true,
+              version: 0,
+              deleted: false,
+              deletedTime: null,
+              deletedBy: "",
+              createdBy: ""
+            }) as BQDiagnosisDictEntityType
+        );
         console.log("回填后 diagnoses:", medicalRecordForm.diagnoses);
         console.log("diagnosisCollapsed 状态:", diagnosisCollapsed.value);
         diagnosisCollapsed.value = false;
@@ -1626,71 +1948,84 @@ const loadFromRoute = async (newRegId?: number | string, newPatientId?: number |
 
         // 处理附加费 (prescType: 5)
         if (presc.prescType === 5) {
-          medicalOrderForm.additionalFees = (full.items ?? []).map((item: any) => ({
-            id: item.itemId,
-            name: item.itemName ?? "",
-            amount: Number(item.price ?? 0)
-          }));
+          medicalOrderForm.additionalFees = (full.items ?? []).map(
+            (item: any) => ({
+              id: item.itemId,
+              name: item.itemName ?? "",
+              amount: Number(item.price ?? 0)
+            })
+          );
           continue;
         }
 
         const typeKey = typeKeyMap[presc.prescType as number] ?? "western";
         const typeData = medicalOrderForm.prescriptionData[typeKey];
-        const items: PrescriptionItem[] = (full.items ?? []).map((item: any) => {
-          // 根据 defaultSaleType 设置单位和单价
-          const saleType = Number(item.defaultSaleType);
-          let resolvedUnit = item.unit || getUnitName(item.unitId);
-          let resolvedUnitId = item.unitId ? Number(item.unitId) : getUnitId(item.unit);
-          let resolvedPrice = Number(item.price ?? 0);
-          let resolvedPriceUnit = item.priceUnit || getUnitName(item.priceUnitId);
-          let resolvedPriceUnitId = item.priceUnitId ? Number(item.priceUnitId) : getUnitId(item.priceUnit);
+        const items: PrescriptionItem[] = (full.items ?? []).map(
+          (item: any) => {
+            // 根据 defaultSaleType 设置单位和单价
+            const saleType = Number(item.defaultSaleType);
+            let resolvedUnit = item.unit || getUnitName(item.unitId);
+            let resolvedUnitId = item.unitId
+              ? Number(item.unitId)
+              : getUnitId(item.unit);
+            let resolvedPrice = Number(item.price ?? 0);
+            let resolvedPriceUnit =
+              item.priceUnit || getUnitName(item.priceUnitId);
+            let resolvedPriceUnitId = item.priceUnitId
+              ? Number(item.priceUnitId)
+              : getUnitId(item.priceUnit);
 
-          if (saleType === 1 && item.prescriptionUnit) {
-            // 散卖：用小单位
-            resolvedUnit = item.prescriptionUnit;
-            resolvedUnitId = unitOptions.value.find(o => o.name === item.prescriptionUnit)?.id;
-            resolvedPrice = parseFloat(item.prescriptionPrice || "0") || 0;
-            resolvedPriceUnit = item.prescriptionUnit;
-            resolvedPriceUnitId = resolvedUnitId;
-          } else if (saleType === 0 && item.wholesaleUnit) {
-            // 整卖：用大单位
-            resolvedUnit = item.wholesaleUnit;
-            resolvedUnitId = unitOptions.value.find(o => o.name === item.wholesaleUnit)?.id;
-            resolvedPrice = parseFloat(item.wholesalePrice || "0") || 0;
-            resolvedPriceUnit = item.wholesaleUnit;
-            resolvedPriceUnitId = resolvedUnitId;
+            if (saleType === 1 && item.prescriptionUnit) {
+              // 散卖：用小单位
+              resolvedUnit = item.prescriptionUnit;
+              resolvedUnitId = unitOptions.value.find(
+                o => o.name === item.prescriptionUnit
+              )?.id;
+              resolvedPrice = parseFloat(item.prescriptionPrice || "0") || 0;
+              resolvedPriceUnit = item.prescriptionUnit;
+              resolvedPriceUnitId = resolvedUnitId;
+            } else if (saleType === 0 && item.wholesaleUnit) {
+              // 整卖：用大单位
+              resolvedUnit = item.wholesaleUnit;
+              resolvedUnitId = unitOptions.value.find(
+                o => o.name === item.wholesaleUnit
+              )?.id;
+              resolvedPrice = parseFloat(item.wholesalePrice || "0") || 0;
+              resolvedPriceUnit = item.wholesaleUnit;
+              resolvedPriceUnitId = resolvedUnitId;
+            }
+
+            return {
+              id: item.id,
+              itemId: item.itemId,
+              itemType: item.itemType ?? 1,
+              itemName: item.itemName ?? "",
+              spec: item.spec ?? "",
+              unit: resolvedUnit,
+              unitId: resolvedUnitId,
+              priceUnit: resolvedPriceUnit,
+              priceUnitId: resolvedPriceUnitId,
+              singleDosage: item.singleDosage ?? "",
+              useWay: item.useWay ?? "",
+              frequency: item.frequency ?? "",
+              time: 1,
+              days: item.days ?? 0,
+              totalNum: Number(item.totalNum ?? 0),
+              entrust: item.entrust ?? "",
+              price: resolvedPrice,
+              totalPrice: Number(item.totalPrice ?? 0),
+              // 补充药品字段
+              prescriptionPrice: item.prescriptionPrice,
+              prescriptionUnit: item.prescriptionUnit,
+              wholesalePrice: item.wholesalePrice,
+              wholesaleUnit: item.wholesaleUnit,
+              conversionValue: item.conversionValue,
+              decoWay: item.decoWay,
+              defaultSaleType: item.defaultSaleType,
+              groupNo: item.groupNo
+            };
           }
-
-          return {
-            id: item.id,
-            itemId: item.itemId,
-            itemType: item.itemType ?? 1,
-            itemName: item.itemName ?? "",
-            spec: item.spec ?? "",
-            unit: resolvedUnit,
-            unitId: resolvedUnitId,
-            priceUnit: resolvedPriceUnit,
-            priceUnitId: resolvedPriceUnitId,
-            singleDosage: item.singleDosage ?? "",
-            useWay: item.useWay ?? "",
-            frequency: item.frequency ?? "",
-            time: 1,
-            days: item.days ?? 0,
-            totalNum: Number(item.totalNum ?? 0),
-            entrust: item.entrust ?? "",
-            price: resolvedPrice,
-            totalPrice: Number(item.totalPrice ?? 0),
-            // 补充药品字段
-            prescriptionPrice: item.prescriptionPrice,
-            prescriptionUnit: item.prescriptionUnit,
-            wholesalePrice: item.wholesalePrice,
-            wholesaleUnit: item.wholesaleUnit,
-            conversionValue: item.conversionValue,
-            decoWay: item.decoWay,
-            defaultSaleType: item.defaultSaleType,
-            groupNo: item.groupNo
-          };
-        });
+        );
         allItems.push(...items);
         // 设置 group 主表字段（中药处方需要 usageType, frequence 等）
         typeData.groups.push({
@@ -1711,13 +2046,28 @@ const loadFromRoute = async (newRegId?: number | string, newPatientId?: number |
       // 循环结束后，设置 currentGroup 并处理中药处方的 batch 回填
       if (medicalOrderForm.prescriptionData.chinese.groups.length > 0) {
         medicalOrderForm.prescriptionData.chinese.currentGroup = 0;
-        const firstChineseGroup = medicalOrderForm.prescriptionData.chinese.groups[0];
+        const firstChineseGroup =
+          medicalOrderForm.prescriptionData.chinese.groups[0];
         nextTick(() => {
           // 只有当 usageType/frequence 有值时才查找名称
-          const usageTypeNum = firstChineseGroup.usageType != null ? Number(firstChineseGroup.usageType) : null;
-          const frequenceNum = firstChineseGroup.frequence != null ? Number(firstChineseGroup.frequence) : null;
-          const usageTypeName = usageTypeNum != null ? usageOptions.value.find(o => Number(o.id) === usageTypeNum)?.name : undefined;
-          const frequenceName = frequenceNum != null ? frequencyOptions.value.find(o => Number(o.id) === frequenceNum)?.name : undefined;
+          const usageTypeNum =
+            firstChineseGroup.usageType != null
+              ? Number(firstChineseGroup.usageType)
+              : null;
+          const frequenceNum =
+            firstChineseGroup.frequence != null
+              ? Number(firstChineseGroup.frequence)
+              : null;
+          const usageTypeName =
+            usageTypeNum != null
+              ? usageOptions.value.find(o => Number(o.id) === usageTypeNum)
+                  ?.name
+              : undefined;
+          const frequenceName =
+            frequenceNum != null
+              ? frequencyOptions.value.find(o => Number(o.id) === frequenceNum)
+                  ?.name
+              : undefined;
           chinesePrescriptionRef.value?.applyTemplateSettings({
             usageTypeName,
             frequenceName,
@@ -1743,6 +2093,10 @@ const loadFromRoute = async (newRegId?: number | string, newPatientId?: number |
       await supplementDrugInfoFromHistory(allItems);
     }
   } catch {}
+
+  // 数据加载完成后取快照，保存按钮初始为禁用
+  takeMedicalRecordSnapshot();
+  takeMedicalOrderSnapshot();
 };
 
 // ==================== Lifecycle ====================
@@ -1753,13 +2107,16 @@ onMounted(async () => {
   await loadUnitDictionary();
   await loadDecoDictionary();
   await loadFromRoute();
+  // loadFromRoute 无数据时提前返回，此处兜底确保快照已初始化
+  if (!medicalRecordSnapshot.value) takeMedicalRecordSnapshot();
+  if (!medicalOrderSnapshot.value) takeMedicalOrderSnapshot();
 });
 
 // 监听路由参数变化
 watch(
   () => [route.query.regId, route.query.patientId],
   ([newRegId, newPatientId]) => {
-    console.log('路由参数变化:', newRegId, newPatientId);
+    console.log("路由参数变化:", newRegId, newPatientId);
     if (newRegId && newPatientId) {
       loadFromRoute(newRegId, newPatientId);
     }
@@ -1924,8 +2281,8 @@ watch(
 
                     <!-- 中药处方 -->
                     <ChinesePrescription
-                      ref="chinesePrescriptionRef"
                       v-show="medicalOrderForm.prescriptionType === 'chinese'"
+                      ref="chinesePrescriptionRef"
                       :type-data="medicalOrderForm.prescriptionData['chinese']"
                       :usage-options="usageOptions"
                       :frequency-options="frequencyOptions"
@@ -1951,11 +2308,17 @@ watch(
 
                     <!-- 附加费 -->
                     <AdditionalFeePrescription
-                      v-show="medicalOrderForm.prescriptionType === 'additionalFee'"
+                      v-show="
+                        medicalOrderForm.prescriptionType === 'additionalFee'
+                      "
                       :fees="medicalOrderForm.additionalFees"
                       @add="handleAddFee"
                       @remove="removeFee"
-                      @update="(index, amount) => medicalOrderForm.additionalFees[index].amount = amount"
+                      @update="
+                        (index, amount) =>
+                          (medicalOrderForm.additionalFees[index].amount =
+                            amount)
+                      "
                     />
                   </div>
                 </el-form-item>
@@ -2005,6 +2368,7 @@ watch(
           v-show="canShowSaveBtn"
           type="primary"
           size="large"
+          :disabled="!medicalRecordDirty"
           @click="handleSave"
         >
           保存
@@ -2030,20 +2394,29 @@ watch(
           v-show="canShowSaveBtn"
           type="primary"
           size="large"
+          :disabled="!medicalOrderDirty"
           @click="handleSaveMedicalOrder"
         >
           保存
         </el-button>
-        <el-dropdown @command="handlePrintCommand" trigger="click">
+        <el-dropdown trigger="click" @command="handlePrintCommand">
           <el-button type="primary" size="large">
             打印处方<el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="current-no-price">打印当前处方(不含金额)</el-dropdown-item>
-              <el-dropdown-item command="current-with-price">打印当前处方(含金额)</el-dropdown-item>
-              <el-dropdown-item command="all-no-price">打印全部处方(不含金额)</el-dropdown-item>
-              <el-dropdown-item command="all-with-price">打印全部处方(含金额)</el-dropdown-item>
+              <el-dropdown-item command="current-no-price"
+                >打印当前处方(不含金额)</el-dropdown-item
+              >
+              <el-dropdown-item command="current-with-price"
+                >打印当前处方(含金额)</el-dropdown-item
+              >
+              <el-dropdown-item command="all-no-price"
+                >打印全部处方(不含金额)</el-dropdown-item
+              >
+              <el-dropdown-item command="all-with-price"
+                >打印全部处方(含金额)</el-dropdown-item
+              >
             </el-dropdown-menu>
           </template>
         </el-dropdown>

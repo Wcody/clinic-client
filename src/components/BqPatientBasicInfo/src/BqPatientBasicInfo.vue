@@ -7,7 +7,7 @@
       <span v-if="collapsed && form.name" class="patient-hint">
         {{ form.name }}&nbsp;·&nbsp;{{ form.gender }}
       </span>
-      <div v-if="hasSelected && !collapsed" class="toolbar" @click.stop>
+      <div v-if="showToolbar && hasSelected && !collapsed" class="toolbar" @click.stop>
         <template v-if="mode === 'locked'">
           <el-button size="small" @click="handleReset">重置</el-button>
           <el-button size="small" type="primary" @click="handleEdit"
@@ -233,11 +233,13 @@ import {
 interface Props {
   showAllergy?: boolean;
   collapseOnSelect?: boolean;
+  showToolbar?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showAllergy: true,
-  collapseOnSelect: true
+  collapseOnSelect: true,
+  showToolbar: false
 });
 
 // ---- emits ----
@@ -308,7 +310,7 @@ const collapsed = ref(false);
 const hasSelected = computed(
   () => mode.value === "locked" || mode.value === "saving"
 );
-const isLocked = computed(() => mode.value === "locked");
+const isLocked = computed(() => mode.value === "locked" || !props.showToolbar);
 
 let snapshot: FormData | null = null;
 

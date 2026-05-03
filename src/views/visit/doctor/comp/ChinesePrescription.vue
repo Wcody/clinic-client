@@ -88,23 +88,50 @@ const freqPatterns: [RegExp, number][] = [
   [/qd|每日一次|每天一次|1次.?日|一次.?日|st|立即/i, 1]
 ];
 
-const getTimesPerDay = (frequency: string): number => {
-  const matched = freqPatterns.find(([re]) => re.test(frequency));
+// 兼容单位以名称或 ID 字符串存储的情况（与 WesternPrescription 保持一致）
+const findUnit = (nameOrId?: string) => {
+  if (!nameOrId) return undefined;
+  return (
+    props.unitOptions.find(o => o.name === nameOrId) ??
+    props.unitOptions.find(o => String(o.id) === nameOrId)
+  );
+};
+
+// 根据用法名称或ID字符串获取用法ID字符串
+const getUsageId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = props.usageOptions.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
+// 根据频率名称或ID字符串获取频率ID字符串
+const getFrequencyId = (nameOrId?: string): string | undefined => {
+  if (!nameOrId) return undefined;
+  if (/^\d+$/.test(nameOrId)) return nameOrId;
+  const opt = props.frequencyOptions.find(o => o.name === nameOrId);
+  return opt ? String(opt.id) : undefined;
+};
+
+const getTimesPerDay = (frequencyIdOrName: string): number => {
+  let freqName = frequencyIdOrName;
+  if (/^\d+$/.test(frequencyIdOrName)) {
+    freqName = props.frequencyOptions.find(o => String(o.id) === frequencyIdOrName)?.name ?? frequencyIdOrName;
+  }
+  const matched = freqPatterns.find(([re]) => re.test(freqName));
   return matched ? matched[1] : 1;
 };
 
-// 用法变化 → 设置 usageType ID 并批量应用
+// 用法变化 → val 为 String(id)，设置 usageType ID 并批量应用
 const onUseWayChange = (val: string) => {
-  const opt = props.usageOptions.find(o => o.name === val);
-  batch.usageType = opt?.id;
+  batch.usageType = Number(val) || undefined;
   applyBatchToItems();
 };
 
-// 频率变化 → 设置 frequence ID，重算总剂数并批量应用
+// 频率变化 → val 为 String(id)，重算总剂数并批量应用
 const onFrequencyChange = (val: string) => {
-  const opt = props.frequencyOptions.find(o => o.name === val);
-  batch.frequence = opt?.id;
-  const timesPerDay = getTimesPerDay(batch.frequency);
+  batch.frequence = Number(val) || undefined;
+  const timesPerDay = getTimesPerDay(val);
   batch.totalDoses = Number((timesPerDay * batch.days).toFixed(2));
   applyBatchToItems();
 };
@@ -143,12 +170,23 @@ const applyBatchToItems = () => {
       // 两个都设置了
       item.wholesaleUnit = batch.wholesaleUnit;
       item.prescriptionUnit = batch.prescriptionUnit;
-      item.unit = batch.wholesaleUnit;
+      const uObj = findUnit(batch.wholesaleUnit);
+      item.unit = uObj?.name ?? batch.wholesaleUnit;
+      item.unitId = uObj?.id;
     } else {
-      // 没设置或只设置了一个，用item的药库值填充所有单位
+      // 按 defaultSaleType 决定单次用量单位（与 handleAddDrug 保持一致）
       item.wholesaleUnit = item.wholesaleUnit || "";
       item.prescriptionUnit = item.prescriptionUnit || "";
-      item.unit = item.wholesaleUnit || item.prescriptionUnit || "";
+      const saleType = Number(item.defaultSaleType);
+      const preferredUnit =
+        saleType === 0
+          ? item.wholesaleUnit || item.prescriptionUnit
+          : item.prescriptionUnit || item.wholesaleUnit;
+      const uObj = findUnit(preferredUnit) ?? findUnit(item.wholesaleUnit) ?? findUnit(item.prescriptionUnit);
+      if (uObj) {
+        item.unit = uObj.name ?? "";
+        if (!item.unitId) item.unitId = uObj.id;
+      }
     }
     recalcItemTotalNum(item);
   });
@@ -181,35 +219,52 @@ const resolveDecoWayId = (nameOrId?: string): string | undefined => {
 const handleAddDrug = (medicine: MedicineItem) => {
   if (!currentGroup.value) return;
 
-  // 根据大单位和小单位设置默认单位和单价
   let resolvedUnit = "";
   let resolvedUnitId: number | undefined = undefined;
   let resolvedPrice = 0;
   let resolvedPriceUnit = "";
   let resolvedPriceUnitId: number | undefined = undefined;
 
-  if (medicine.wholesaleUnit && medicine.prescriptionUnit) {
-    // 两个都设置了，根据默认售卖方式决定
-    if (medicine.defaultSaleType === 0) {
-      // 整卖：用大单位
-      resolvedUnit = medicine.wholesaleUnit;
-      resolvedUnitId = props.unitOptions.find(o => o.name === medicine.wholesaleUnit)?.id;
-      resolvedPrice = parseFloat(medicine.wholesalePrice || "0") || 0;
-      resolvedPriceUnit = medicine.wholesaleUnit;
-      resolvedPriceUnitId = resolvedUnitId;
-    } else {
-      // 散卖：用小单位
-      resolvedUnit = medicine.prescriptionUnit;
-      resolvedUnitId = props.unitOptions.find(o => o.name === medicine.prescriptionUnit)?.id;
-      resolvedPrice = parseFloat(medicine.prescriptionPrice || "0") || 0;
-      resolvedPriceUnit = medicine.prescriptionUnit;
-      resolvedPriceUnitId = resolvedUnitId;
+  const saleType = Number(medicine.defaultSaleType);
+
+  // 单价：根据默认售卖方式
+  if (saleType === 0) {
+    resolvedPrice = parseFloat(medicine.wholesalePrice || "0") || 0;
+  } else {
+    resolvedPrice = parseFloat(medicine.prescriptionPrice || "0") || 0;
+  }
+
+  // 单次用量单位：优先药库 unitId，回退到大单位（与 WesternPrescription 保持一致）
+  if (medicine.unitId) {
+    const uObj = props.unitOptions.find(o => o.id === medicine.unitId);
+    if (uObj) {
+      resolvedUnit = uObj.name ?? "";
+      resolvedUnitId = uObj.id;
+    }
+  }
+  if (!resolvedUnit) {
+    const uObj = findUnit(medicine.wholesaleUnit);
+    if (uObj) {
+      resolvedUnit = uObj.name ?? "";
+      resolvedUnitId = uObj.id;
+    }
+  }
+
+  // 计价单位：整卖用大单位，散卖用小单位，回退到单次用量单位
+  if (saleType === 0) {
+    const uObj = findUnit(medicine.wholesaleUnit);
+    if (uObj) {
+      resolvedPriceUnit = uObj.name ?? "";
+      resolvedPriceUnitId = uObj.id;
     }
   } else {
-    // 其它情况用药库原始值
-    resolvedUnit = props.unitOptions.find(o => o.id === medicine.unitId)?.name ?? "";
-    resolvedUnitId = medicine.unitId;
-    resolvedPrice = parseFloat(medicine.price || "0") || 0;
+    const uObj = findUnit(medicine.prescriptionUnit);
+    if (uObj) {
+      resolvedPriceUnit = uObj.name ?? "";
+      resolvedPriceUnitId = uObj.id;
+    }
+  }
+  if (!resolvedPriceUnit) {
     resolvedPriceUnit = resolvedUnit;
     resolvedPriceUnitId = resolvedUnitId;
   }
@@ -259,7 +314,7 @@ const handleUnitChange = (item: PrescriptionItem) => {
     // 选择大单位（整卖），使用整卖价格，计价总量换算
     item.price = parseFloat(item.wholesalePrice || "0") || 0;
     item.priceUnit = item.wholesaleUnit;
-    item.priceUnitId = props.unitOptions.find(o => o.name === item.wholesaleUnit)?.id;
+    item.priceUnitId = findUnit(item.wholesaleUnit)?.id;
     // 从小单位切换到大单位：总量减少（除以整散比）
     if (item.prescriptionUnit && oldTotalNum > 0) {
       item.totalNum = Number((oldTotalNum / conversionValue).toFixed(2));
@@ -268,7 +323,7 @@ const handleUnitChange = (item: PrescriptionItem) => {
     // 选择小单位（散卖），使用散卖价格，计价总量换算
     item.price = parseFloat(item.prescriptionPrice || "0") || 0;
     item.priceUnit = item.prescriptionUnit;
-    item.priceUnitId = props.unitOptions.find(o => o.name === item.prescriptionUnit)?.id;
+    item.priceUnitId = findUnit(item.prescriptionUnit)?.id;
     // 从大单位切换到小单位：总量增加（乘以整散比）
     if (item.wholesaleUnit && oldTotalNum > 0) {
       item.totalNum = Number((oldTotalNum * conversionValue).toFixed(2));
@@ -281,21 +336,18 @@ const handleDecoChange = (item: PrescriptionItem) => {
   // 煎药方式
 };
 
-// 获取每个药品的单位选项
+// 获取每个药品的单位选项（兼容名称/ID字符串两种存储方式，与 WesternPrescription 保持一致）
 const getItemUnitOptions = (item: PrescriptionItem) => {
-  // 如果同时设置了大单位和小单位，则只填充大单位和小单位
   if (item.wholesaleUnit && item.prescriptionUnit) {
     const options: BQMedicalDictionaryEntityType[] = [];
-    const wholesaleOpt = props.unitOptions.find(o => o.name === item.wholesaleUnit);
+    const wholesaleOpt = findUnit(item.wholesaleUnit);
     if (wholesaleOpt) options.push({ ...wholesaleOpt });
-    // 只有不同时才加入小单位
     if (item.prescriptionUnit !== item.wholesaleUnit) {
-      const prescriptionOpt = props.unitOptions.find(o => o.name === item.prescriptionUnit);
+      const prescriptionOpt = findUnit(item.prescriptionUnit);
       if (prescriptionOpt) options.push({ ...prescriptionOpt });
     }
-    return options;
+    if (options.length > 0) return options;
   }
-  // 其它情况填充所有单位
   return props.unitOptions;
 };
 
@@ -339,14 +391,18 @@ const applyTemplateSettings = (settings: {
   skipApplyItems?: boolean;
 }) => {
   if (settings.usageTypeName) {
-    batch.useWay = settings.usageTypeName;
     const opt = props.usageOptions.find(o => o.name === settings.usageTypeName);
-    batch.usageType = opt?.id;
+    if (opt) {
+      batch.useWay = String(opt.id);
+      batch.usageType = opt.id;
+    }
   }
   if (settings.frequenceName) {
-    batch.frequency = settings.frequenceName;
     const opt = props.frequencyOptions.find(o => o.name === settings.frequenceName);
-    batch.frequence = opt?.id;
+    if (opt) {
+      batch.frequency = String(opt.id);
+      batch.frequence = opt.id;
+    }
   }
   if (settings.doseAmount) {
     batch.totalDoses = settings.doseAmount;
@@ -409,7 +465,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
           v-for="opt in props.usageOptions"
           :key="opt.id"
           :label="opt.name"
-          :value="opt.name"
+          :value="String(opt.id)"
         />
       </el-select>
 
@@ -424,7 +480,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
           v-for="opt in props.frequencyOptions"
           :key="opt.id"
           :label="opt.name"
-          :value="opt.name"
+          :value="String(opt.id)"
         />
       </el-select>
 
@@ -497,6 +553,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
               type="number"
               style="width: 100%"
               min="1"
+              step="10"
             />
           </div>
           <div class="col-name">{{ item.itemName }}</div>
@@ -716,7 +773,7 @@ defineExpose({ applyTemplateSettings, applyBatchToItems });
       }
 
       .col-group {
-        width: 44px;
+        width: 56px;
         flex-shrink: 0;
       }
 

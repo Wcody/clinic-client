@@ -5,8 +5,7 @@ import {
   type BQResultType,
   type BQSearchPageResultType,
   type BQBaseEntityType,
-  getBaseEntityDefault,
-  BQSearchFilter
+  getBaseEntityDefault
 } from "../api";
 
 /**
@@ -14,6 +13,7 @@ import {
  */
 export type BQTreatmentItemEntityType = {
   name: string;
+  pinyin?: string;
   seq?: string;
   projectCode?: string;
   sellingPrice?: string;
@@ -29,6 +29,7 @@ export const getTreatmentItemEntityDefault: (
 ) => BQTreatmentItemEntityType = (row?: BQTreatmentItemEntityType) => {
   return {
     name: row?.name ?? "",
+    pinyin: row?.pinyin ?? "",
     seq: row?.seq ?? "",
     projectCode: row?.projectCode ?? "",
     sellingPrice: row?.sellingPrice ?? "",
@@ -85,6 +86,15 @@ export const getTreatmentItemListApi = (data?: object) => {
   };
   return http.request<BQTreatmentItemSearchListResultType>("get", "/treatment/item/list", {
     params
+  });
+};
+
+/**
+ * 关键字搜索治疗项目（匹配项目名称 / 拼音码）
+ */
+export const searchTreatmentItemApi = (keyword?: string) => {
+  return http.request<BQTreatmentItemSearchListResultType>("get", "/treatment/item/search", {
+    params: { keyword }
   });
 };
 

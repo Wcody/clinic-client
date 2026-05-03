@@ -596,6 +596,7 @@ onMounted(() => {
                   ref="patientBasicInfoRef"
                   :show-allergy="false"
                   :collapse-on-select="false"
+                  :show-toolbar="true"
                   @user-select="handlePatientChange"
                   @save="handlePatientSave"
                 />

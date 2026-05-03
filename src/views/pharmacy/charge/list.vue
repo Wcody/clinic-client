@@ -76,6 +76,7 @@ const pendingColumns = ref<any>([
     minWidth: 120,
     slot: "pendingTotalPrice"
   },
+  { label: "诊断", prop: "diagnosis", minWidth: 150 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "挂号时间", prop: "orderTime", minWidth: 160 },
   { label: "收费状态", prop: "statusFee", minWidth: 100, hide: true },
@@ -112,6 +113,7 @@ const diagnosedColumns = ref<any>([
     minWidth: 120,
     slot: "diagnosedTotalPrice"
   },
+  { label: "诊断", prop: "diagnosis", minWidth: 150 },
   { label: "医生", prop: "doctor", minWidth: 120 },
   { label: "就诊时间", prop: "orderTime", minWidth: 180 },
   { label: "就诊状态", prop: "status", minWidth: 100 },

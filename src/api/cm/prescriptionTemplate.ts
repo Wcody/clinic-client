@@ -35,6 +35,12 @@ export type BQPrescriptionTemplateDetailEntityType = {
   days?: number;
   /** 煎煮类型ID（中药） */
   cookingType?: number;
+  /** 用法类型ID */
+  usageType?: number;
+  /** 频率ID */
+  frequency?: number;
+  /** 医嘱/嘱托 */
+  recommendation?: string;
   /** 组号（用于分组显示） */
   groupNo?: number;
   /** 排序 */
@@ -273,6 +279,19 @@ export const addPrescriptionTemplateDetailApi = (data?: object) => {
   return http.request<BQPrescriptionTemplateDetailEntityResultType>(
     "post",
     "/prescription/template/detail/save",
+    { data }
+  );
+};
+
+/**
+ * 批量新增处方模板明细API
+ */
+export const addPrescriptionTemplateDetailBatchApi = (
+  data: BQPrescriptionTemplateDetailEntityType[]
+) => {
+  return http.request<BQResultType<boolean>>(
+    "post",
+    "/prescription/template/detail/saveBatch",
     { data }
   );
 };

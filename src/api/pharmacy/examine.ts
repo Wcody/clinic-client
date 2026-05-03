@@ -5,8 +5,7 @@ import {
   type BQResultType,
   type BQSearchPageResultType,
   type BQBaseEntityType,
-  getBaseEntityDefault,
-  BQSearchFilter
+  getBaseEntityDefault
 } from "../api";
 
 /**
@@ -14,6 +13,7 @@ import {
  */
 export type BQExamineItemEntityType = {
   name: string;
+  pinyin?: string;
   seq?: string;
   projectCode?: string;
   sellingPrice?: string;
@@ -29,6 +29,7 @@ export const getExamineItemEntityDefault: (
 ) => BQExamineItemEntityType = (row?: BQExamineItemEntityType) => {
   return {
     name: row?.name ?? "",
+    pinyin: row?.pinyin ?? "",
     seq: row?.seq ?? "",
     projectCode: row?.projectCode ?? "",
     sellingPrice: row?.sellingPrice ?? "",
@@ -85,6 +86,15 @@ export const getExamineItemListApi = (data?: object) => {
   };
   return http.request<BQExamineItemSearchListResultType>("get", "/examine/item/list", {
     params
+  });
+};
+
+/**
+ * 关键字搜索检查检验项目（匹配项目名称 / 拼音码）
+ */
+export const searchExamineItemApi = (keyword?: string) => {
+  return http.request<BQExamineItemSearchListResultType>("get", "/examine/item/search", {
+    params: { keyword }
   });
 };
 

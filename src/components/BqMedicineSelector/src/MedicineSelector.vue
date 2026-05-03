@@ -491,11 +491,13 @@ function updateDropdownPosition() {
     return;
   }
   const rect = selectorRef.value.getBoundingClientRect();
+  const width = Math.max(rect.width, 760);
+  const height = dropdownRef.value?.offsetHeight ?? 0;
   dropdownStyle.value = {
     position: "fixed",
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    minWidth: `${Math.max(rect.width, 760)}px`,
+    top: `${Math.max(0, rect.bottom - height)}px`,
+    left: `${rect.right}px`,
+    minWidth: `${width}px`,
     zIndex: "9999"
   };
 }
@@ -555,6 +557,7 @@ function openDropdown() {
   loadAllData();
   nextTick(() => {
     updateDropdownPosition();
+    requestAnimationFrame(updateDropdownPosition);
     setTimeout(() => {
       shouldIgnoreClickOutside.value = false;
     }, 50);

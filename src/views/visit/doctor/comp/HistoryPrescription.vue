@@ -183,6 +183,7 @@ defineExpose({ open });
             <table v-else class="items-table">
               <thead>
                 <tr>
+                  <th>组号</th>
                   <th>名称</th>
                   <th>规格</th>
                   <th>单位</th>
@@ -197,6 +198,7 @@ defineExpose({ open });
               </thead>
               <tbody>
                 <tr v-for="item in items" :key="item.id">
+                  <td>{{ item.groupNo != null ? item.groupNo : "—" }}</td>
                   <td>{{ item.itemName }}</td>
                   <td>{{ item.spec || "—" }}</td>
                   <td>{{ item.unit || "—" }}</td>

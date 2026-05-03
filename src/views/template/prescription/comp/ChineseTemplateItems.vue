@@ -110,7 +110,7 @@ watch(
               @click="emit('remove', index)"
             />
           </td>
-          <td class="index-cell">{{ index + 1 }}</td>
+          <td class="index-cell">{{ item.groupNo }}</td>
           <td class="name-cell">{{ item.drugName }}</td>
           <td class="deco-cell">
             <el-select

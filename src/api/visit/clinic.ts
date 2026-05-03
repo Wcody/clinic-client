@@ -214,9 +214,29 @@ export type BqPrescriptionItemEntityType = {
   totalPrice?: number;
   /** 组号 */
   groupNo?: number;
+  /** 保存顺序值，查询时按 sort, id 排序 */
+  sort?: number;
   /** 煎药方式（字典ID字符串） */
   decoWay?: string;
   createdTime?: string;
+  /** 单次用量单位ID */
+  unitId?: number;
+  /** 计价单位名称 */
+  priceUnit?: string;
+  /** 计价单位ID */
+  priceUnitId?: number;
+  /** 散卖价格 */
+  prescriptionPrice?: string;
+  /** 散卖单位 */
+  prescriptionUnit?: string;
+  /** 整卖价格 */
+  wholesalePrice?: string;
+  /** 整卖单位 */
+  wholesaleUnit?: string;
+  /** 整散比 */
+  conversionValue?: string;
+  /** 默认售卖方式：0整卖 1散卖 */
+  defaultSaleType?: number;
 };
 
 // ==================== 诊断字典类型（对应 BqDiagnosisDictEntity，/ams/api/v1/diagnosis/dict） ====================

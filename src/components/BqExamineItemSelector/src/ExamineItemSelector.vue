@@ -47,11 +47,12 @@
           class="is-table"
           :current-row-key="activeRowKey"
           row-key="id"
+          @mousedown="handleTableMouseDown"
           @row-click="handleSelect"
         >
           <el-table-column prop="name" label="项目名称" min-width="150" />
           <el-table-column prop="seq" label="序号" width="70" />
-          <el-table-column prop="projectCode" label="项目编码" width="120" />
+          <el-table-column prop="pinyin" label="拼音码" width="120" />
           <el-table-column prop="sellingPrice" label="售价" width="90" />
           <el-table-column prop="costPrice" label="成本价" width="90" />
           <el-table-column prop="status" label="状态" width="70" />
@@ -112,6 +113,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { ArrowDown, Loading } from "@element-plus/icons-vue";
 import {
   getExamineItemListApi,
+  searchExamineItemApi,
   type BQExamineItemEntityType
 } from "@/api/pharmacy/examine";
 
@@ -123,7 +125,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: "",
-  placeholder: "请输入项目名称 / 编码搜索",
+  placeholder: "请输入项目名称 / 拼音码搜索",
   disabled: false
 });
 
@@ -147,7 +149,9 @@ const jumpInput = ref<number>(1);
 const dropdownStyle = ref<Record<string, string>>({});
 const activeIndex = ref(-1);
 const shouldIgnoreClickOutside = ref(false);
-const dataLoaded = ref(false);
+const isDragging = ref(false);
+const dragOffset = ref({ x: 0, y: 0 });
+const customPosition = ref<{ top: number; left: number } | null>(null);
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -158,14 +162,14 @@ watch(
   }
 );
 
-async function fetchItems() {
+async function fetchItems(searchKeyword = "") {
   loading.value = true;
   try {
-    const res = await getExamineItemListApi();
+    const kw = searchKeyword.trim();
+    const res = kw ? await searchExamineItemApi(kw) : await getExamineItemListApi();
     if (res?.data) {
       rawData.value = res.data as unknown as BQExamineItemEntityType[];
     }
-    dataLoaded.value = true;
   } catch {
     rawData.value = [];
   } finally {
@@ -179,7 +183,7 @@ const filteredData = computed<BQExamineItemEntityType[]>(() => {
   return rawData.value.filter(
     item =>
       (item.name ?? "").toLowerCase().includes(kw) ||
-      (item.projectCode ?? "").toLowerCase().includes(kw)
+      (item.pinyin ?? "").toLowerCase().includes(kw)
   );
 });
 
@@ -217,12 +221,22 @@ const visiblePages = computed<number[]>(() => {
 
 function updateDropdownPosition() {
   if (!selectorRef.value) return;
+  if (customPosition.value) {
+    dropdownStyle.value = {
+      ...dropdownStyle.value,
+      left: `${customPosition.value.left}px`,
+      top: `${customPosition.value.top}px`
+    };
+    return;
+  }
   const rect = selectorRef.value.getBoundingClientRect();
+  const width = Math.max(rect.width, 620);
+  const height = dropdownRef.value?.offsetHeight ?? 0;
   dropdownStyle.value = {
     position: "fixed",
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    minWidth: `${Math.max(rect.width, 620)}px`,
+    top: `${Math.max(0, rect.bottom - height)}px`,
+    left: `${rect.right}px`,
+    minWidth: `${width}px`,
     zIndex: "9999"
   };
 }
@@ -263,11 +277,11 @@ function openDropdown() {
   visible.value = true;
   activeIndex.value = -1;
   shouldIgnoreClickOutside.value = true;
-  if (!dataLoaded.value && !loading.value) {
-    fetchItems();
-  }
+  customPosition.value = null;
+  fetchItems(keyword.value);
   nextTick(() => {
     updateDropdownPosition();
+    requestAnimationFrame(updateDropdownPosition);
     setTimeout(() => {
       shouldIgnoreClickOutside.value = false;
     }, 50);
@@ -299,8 +313,45 @@ function handleSearch() {
   if (!visible.value) openDropdown();
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    if (!dataLoaded.value && !loading.value) fetchItems();
+    fetchItems(keyword.value);
   }, 300);
+}
+
+function startDrag(e: MouseEvent) {
+  if (!dropdownRef.value) return;
+  isDragging.value = true;
+  const rect = dropdownRef.value.getBoundingClientRect();
+  dragOffset.value = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+  document.addEventListener("mousemove", onDrag);
+  document.addEventListener("mouseup", stopDrag);
+}
+
+function handleTableMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (target.closest(".el-table__header-wrapper")) {
+    startDrag(e);
+  }
+}
+
+function onDrag(e: MouseEvent) {
+  if (!isDragging.value || !dropdownRef.value) return;
+  const newLeft = e.clientX - dragOffset.value.x;
+  const newTop = e.clientY - dragOffset.value.y;
+  dropdownStyle.value = {
+    ...dropdownStyle.value,
+    left: `${newLeft}px`,
+    top: `${newTop}px`
+  };
+  customPosition.value = { top: newTop, left: newLeft };
+}
+
+function stopDrag() {
+  isDragging.value = false;
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 }
 
 function handleSelect(row: BQExamineItemEntityType) {
@@ -368,6 +419,8 @@ onUnmounted(() => {
   document.removeEventListener("mousedown", handleClickOutside);
   window.removeEventListener("scroll", handleScrollOrResize, true);
   window.removeEventListener("resize", handleScrollOrResize);
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
 });
 </script>
 
@@ -438,6 +491,7 @@ onUnmounted(() => {
 }
 
 .is-table :deep(.el-table__row) { cursor: pointer; }
+.is-table :deep(.el-table__header-wrapper) { cursor: move; }
 .is-table :deep(.el-table__row:hover > td) { background-color: #ecf5ff !important; }
 .is-table :deep(.el-table__row.current-row > td) { background-color: #d9ecff !important; }
 .is-table :deep(.el-table__header) { background: linear-gradient(to bottom, #f0f5ff, #e6eeff); }
