@@ -194,34 +194,81 @@ const ensurePatientAndRegistration = async (): Promise<{
 };
 
 // ==================== 患者选择回调 ====================
+// 在弹窗前保存旧患者表单数据的快照，用于取消时回滚
+let oldPatientSnapshot: any = null;
+const saveOldPatientSnapshot = () => {
+  // defineExpose 暴露的 ref 通过组件实例访问时已自动解包
+  const formValue = basicInfoRef.value?.form as unknown as Record<string, any>;
+  if (!formValue) return;
+  oldPatientSnapshot = JSON.parse(JSON.stringify(formValue));
+};
+
 const onBeforePatientSelect = async (user: any) => {
   if (currentRegId.value) {
-    // 确认之前先获取当前患者ID
+    // 弹窗前先保存旧患者数据快照（此时 confirmPatientSelect 尚未执行）
     const currentPatientId = basicInfoRef.value?.form?.id;
+    saveOldPatientSnapshot();
     try {
       await ElMessageBox.confirm("当前已有正在接诊的患者，是否切换？", "提示", {
         confirmButtonText: "确认",
         cancelButtonText: "取消",
         type: "warning"
       });
-      // 确认后，保存当前状态到缓存
-      saveClinicCache(currentRegId.value, currentPatientId);
-      // 重置状态
+      // 确认后：此时子组件已通过 confirmPatientSelect 应用了新患者，只需清理业务状态
+      if (currentPatientId != null) {
+        saveClinicCache(currentRegId.value, currentPatientId);
+      }
+      // 完整重置所有业务状态，防止旧患者数据残留到新患者
       currentRegId.value = undefined;
       currentMedicalRecordId.value = undefined;
+      currentRegStatus.value = null;
+      currentRegStatusFee.value = null;
+      forceShowSaveBtn.value = false;
+      // 重置病历表单所有字段（与 onReset 保持一致）
+      medicalRecordForm.chiefComplaint = "";
+      medicalRecordForm.presentIllness = "";
+      medicalRecordForm.pastHistory = "";
+      medicalRecordForm.allergyHistory = 0;
+      medicalRecordForm.allergyDetail = "";
+      medicalRecordForm.personalHistory = "";
+      medicalRecordForm.marriageHistory = "";
+      medicalRecordForm.familyHistory = "";
+      medicalRecordForm.travelHistory = "";
+      medicalRecordForm.contactHistory = "";
+      medicalRecordForm.temperature = "";
+      medicalRecordForm.heartRate = "";
+      medicalRecordForm.respiration = "";
+      medicalRecordForm.bloodPressureSystolic = "";
+      medicalRecordForm.bloodPressureDiastolic = "";
+      medicalRecordForm.otherExamination = "";
+      medicalRecordForm.diagnoses = [];
+      medicalRecordForm.advice = "";
+      // 重置处方数据
       Object.values(medicalOrderForm.prescriptionData).forEach(typeData => {
         typeData.groups.forEach(g => (g.prescId = undefined));
       });
-      medicalRecordForm.diagnoses = [];
-      // 确认后应用新患者数据
-      basicInfoRef.value?.confirmPatientSelect(user);
+      // 重置附加费
+      medicalOrderForm.additionalFees = [];
+      // 重置快照，使保存按钮状态正确
+      takeMedicalRecordSnapshot();
+      takeMedicalOrderSnapshot();
     } catch {
-      // 取消，不做任何操作
+      // 取消：回滚到旧患者数据（此时子组件的 confirmPatientSelect 已把 form 改成新患者）
+      if (oldPatientSnapshot) {
+        const bf = basicInfoRef.value;
+        if (bf) {
+          // 通过 Object.assign 就地恢复数据，避免 Vue 3 proxy setter 兼容性问题
+          const targetForm = bf.form as unknown as Record<string, unknown>;
+          Object.keys(oldPatientSnapshot).forEach(key => {
+            targetForm[key] = oldPatientSnapshot[key];
+          });
+        }
+      }
+    } finally {
+      oldPatientSnapshot = null;
     }
-  } else {
-    // 没有正在接诊的患者，直接应用
-    basicInfoRef.value?.confirmPatientSelect(user);
   }
+  // 无 currentRegId 时，子组件的 confirmPatientSelect 已同步执行，无需额外处理
 };
 
 const onPatientSelect = async (user: any) => {
@@ -262,7 +309,7 @@ const onReset = () => {
   medicalRecordForm.bloodPressureDiastolic = "";
   medicalRecordForm.otherExamination = "";
   medicalRecordForm.diagnoses = [];
-  medicalRecordForm.treatmentAdvice = "";
+  medicalRecordForm.advice = "";
   // 重置处方数据
   Object.values(medicalOrderForm.prescriptionData).forEach(typeData => {
     typeData.groups = [
@@ -329,7 +376,7 @@ const medicalRecordForm = reactive({
   bloodPressureDiastolic: "",
   otherExamination: "",
   diagnoses: [] as BQDiagnosisDictEntityType[],
-  treatmentAdvice: ""
+  advice: ""
 });
 
 // ==================== 诊断信息面板 ====================
@@ -373,7 +420,7 @@ const onHistoryMedicalRecordConfirm = (record: any) => {
   medicalRecordForm.chiefComplaint = record.chiefComplaint || "";
   medicalRecordForm.presentIllness = record.presentIllness || "";
   medicalRecordForm.pastHistory = record.pastHistory || "";
-  medicalRecordForm.treatmentAdvice = record.advice || "";
+  medicalRecordForm.advice = record.advice || "";
   if (record.physicalExam) {
     medicalRecordForm.temperature = record.physicalExam.temperature || "";
     medicalRecordForm.heartRate = record.physicalExam.heartRate || "";
@@ -565,7 +612,7 @@ const onMedicalTemplateConfirm = (
   if (detail.bloodPressureLow)
     medicalRecordForm.bloodPressureDiastolic = String(detail.bloodPressureLow);
   medicalRecordForm.otherExamination = detail.otherExamine || "";
-  medicalRecordForm.treatmentAdvice = detail.treatmentRecommendation || "";
+  medicalRecordForm.advice = detail.treatmentRecommendation || "";
 };
 
 // ==================== 处方模板 ====================
@@ -1166,7 +1213,7 @@ const getMedicalRecordState = () =>
     bloodPressureDiastolic: medicalRecordForm.bloodPressureDiastolic,
     otherExamination: medicalRecordForm.otherExamination,
     diagnoses: medicalRecordForm.diagnoses.map(d => d.diagnosisName),
-    treatmentAdvice: medicalRecordForm.treatmentAdvice
+    advice: medicalRecordForm.advice
   });
 
 const getMedicalOrderState = () =>
@@ -1253,7 +1300,7 @@ const saveMedicalRecord = async (): Promise<number | undefined> => {
     physicalExam,
     diagnosis: diagnosisText,
     diagnosisIds,
-    advice: medicalRecordForm.treatmentAdvice,
+    advice: medicalRecordForm.advice,
     seeTime: new Date().toISOString()
   };
 
@@ -1412,7 +1459,11 @@ const canEndVisit = computed(
 );
 
 // ==================== 操作按钮 ====================
+const saving = ref(false);
+
 const handleSave = async () => {
+  if (saving.value) return;
+  saving.value = true;
   try {
     const ids = await ensurePatientAndRegistration();
     if (!ids) return;
@@ -1421,10 +1472,13 @@ const handleSave = async () => {
     ElMessage.success("保存成功");
   } catch {
     ElMessage.error("保存失败");
+  } finally {
+    saving.value = false;
   }
 };
 
 const handleSaveMedicalOrder = async () => {
+  if (saving.value) return;
   const form = basicInfoRef.value?.form;
   if (!form?.name?.trim()) {
     ElMessage.warning("请先填写患者基本信息");
@@ -1435,6 +1489,7 @@ const handleSaveMedicalOrder = async () => {
     ElMessage.warning("请录入处方明细");
     return;
   }
+  saving.value = true;
   try {
     const ids = await ensurePatientAndRegistration();
     if (!ids) return;
@@ -1458,6 +1513,8 @@ const handleSaveMedicalOrder = async () => {
     }
   } catch {
     ElMessage.error("保存失败");
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -1482,7 +1539,7 @@ const handleSaveAsTemplate = async () => {
     !form.bloodPressureSystolic?.trim() &&
     !form.bloodPressureDiastolic?.trim() &&
     !form.otherExamination?.trim() &&
-    !form.treatmentAdvice?.trim() &&
+    !form.advice?.trim() &&
     form.diagnoses.length === 0;
 
   if (isEmpty) {
@@ -1523,7 +1580,7 @@ const handleSaveAsTemplate = async () => {
         ? parseFloat(form.bloodPressureDiastolic)
         : undefined,
       otherExamine: form.otherExamination,
-      treatmentRecommendation: form.treatmentAdvice,
+      treatmentRecommendation: form.advice,
       status: true
     });
     ElMessage.success("病历模板保存成功");
@@ -1567,8 +1624,7 @@ const handleSubmit = async () => {
 
 const handlePrintPrescription = async (
   showPrice: boolean,
-  printCurrent: boolean,
-  prescType?: number
+  prescId?: number
 ) => {
   const regId = currentRegId.value;
   if (!regId) {
@@ -1577,12 +1633,7 @@ const handlePrintPrescription = async (
   }
 
   try {
-    const blob = await printPrescriptionPdfApi(
-      regId,
-      showPrice,
-      printCurrent,
-      prescType
-    );
+    const blob = await printPrescriptionPdfApi(regId, showPrice, prescId);
     if (!blob || blob.size === 0) {
       ElMessage.error("获取处方PDF失败");
       return;
@@ -1600,26 +1651,20 @@ const handlePrintPrescription = async (
 
 // 处理打印命令
 const handlePrintCommand = (command: string) => {
-  let showPrice = false;
-  let printCurrent = false;
-  let prescType: number | undefined;
-
-  if (command === "current-no-price") {
-    showPrice = false;
-    printCurrent = true;
-    prescType = getPrescTypeByTab(medicalOrderForm.prescriptionType);
-  } else if (command === "current-with-price") {
-    showPrice = true;
-    printCurrent = true;
-    prescType = getPrescTypeByTab(medicalOrderForm.prescriptionType);
+  if (command === "current-no-price" || command === "current-with-price") {
+    const typeData = getCurrentPrescriptionData();
+    const currentGroup = typeData.groups[typeData.currentGroup];
+    const prescId = currentGroup?.prescId;
+    if (!prescId) {
+      ElMessage.warning("请先保存当前处方后再打印");
+      return;
+    }
+    handlePrintPrescription(command === "current-with-price", prescId);
   } else if (command === "all-no-price") {
-    showPrice = false;
-    printCurrent = false;
+    handlePrintPrescription(false);
   } else if (command === "all-with-price") {
-    showPrice = true;
-    printCurrent = false;
+    handlePrintPrescription(true);
   }
-  handlePrintPrescription(showPrice, printCurrent, prescType);
 };
 
 const handleSaveAsPrescriptionTemplate = async () => {
@@ -1849,7 +1894,7 @@ const loadFromRoute = async (
   medicalRecordForm.bloodPressureDiastolic = "";
   medicalRecordForm.otherExamination = "";
   medicalRecordForm.diagnoses = [];
-  medicalRecordForm.treatmentAdvice = "";
+  medicalRecordForm.advice = "";
   Object.values(medicalOrderForm.prescriptionData).forEach(td => {
     const prescType = td.groups[0]?.prescType ?? 1;
     const prefix = prescType === 3 || prescType === 4 ? "项目" : "处方";
@@ -1885,7 +1930,7 @@ const loadFromRoute = async (
       medicalRecordForm.chiefComplaint = record.chiefComplaint ?? "";
       medicalRecordForm.presentIllness = record.presentIllness ?? "";
       medicalRecordForm.pastHistory = record.pastHistory ?? "";
-      medicalRecordForm.treatmentAdvice = record.advice ?? "";
+      medicalRecordForm.advice = record.advice ?? "";
       if (record.physicalExam) {
         try {
           const exam = JSON.parse(record.physicalExam);
@@ -2022,7 +2067,8 @@ const loadFromRoute = async (
               conversionValue: item.conversionValue,
               decoWay: item.decoWay,
               defaultSaleType: item.defaultSaleType,
-              groupNo: item.groupNo
+              groupNo: item.groupNo,
+              sort: item.sort
             };
           }
         );
@@ -2326,7 +2372,7 @@ watch(
                 <!-- 治疗建议 -->
                 <el-form-item label="治疗建议" class="form-row">
                   <el-input
-                    v-model="medicalRecordForm.treatmentAdvice"
+                    v-model="medicalRecordForm.advice"
                     type="textarea"
                     :rows="3"
                     class="form-input-full"

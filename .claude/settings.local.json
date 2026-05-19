@@ -40,7 +40,12 @@
       "Bash(\"/c/Users/Wcke/AppData/Local/Programs/Microsoft VS Code/code\" \"d:/Wcke/000SourceCode/IDEAProjects/Clinic-Client/src/components/BqMedicineSelector/src/MedicineSelector.vue\")",
       "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
       "Bash(git checkout *)",
-      "Bash(grep -E \"\\\\.\\(vue|ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(vue|ts|js\\)$\")",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api *)",
+      "Bash(gh.exe api *)",
+      "Bash(python -c \"import sys,base64; print\\(base64.b64decode\\(sys.stdin.read\\(\\)\\).decode\\(\\)\\)\")",
+      "PowerShell(gh api repos/obra/superpowers/readme 2>&1)"
     ],
     "additionalDirectories": [
       "d:\\Wcke\\000SourceCode\\IDEAProjects\\Clinic-Client\\src\\views\\visit\\doctor",

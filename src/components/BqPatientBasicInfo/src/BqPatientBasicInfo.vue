@@ -257,9 +257,9 @@ interface FormData {
   isFirstVisit: boolean; // 是否初诊
   name: string; // 患者姓名
   gender: string; // 性别
-  firstAge: number; // 主年龄值
+  firstAge: number | null; // 主年龄值（null 表示未录入）
   ageType: number; // 年龄类型：1=岁 2=月 3=天
-  lastAge: number; // 次年龄值（月数/天数）
+  lastAge: number | null; // 次年龄值（月数/天数）
   idCard: string; // 身份证号
   mobile: string; // 手机号
   province: number | null; // 省份ID
@@ -277,9 +277,9 @@ const defaultForm = (): FormData => ({
   isFirstVisit: true,
   name: "",
   gender: "男",
-  firstAge: 0,
+  firstAge: null,
   ageType: 1,
-  lastAge: 0,
+  lastAge: null,
   idCard: "",
   mobile: "",
   province: null,
@@ -347,7 +347,7 @@ const ageYearError = ref(false);
 
 function validateFirstAge() {
   const value = form.value.firstAge;
-  ageYearError.value = (!value && value !== 0) || value < 0;
+  ageYearError.value = value == null || value < 0;
   validationErrors.value.firstAge = ageYearError.value;
   return !ageYearError.value;
 }
@@ -498,8 +498,8 @@ function applyPatientData(patient: any) {
   form.value.name = patient.name ?? "";
   form.value.gender = patient.gender === "女" ? "女" : "男";
   form.value.ageType = patient.ageType ?? 1;
-  form.value.firstAge = patient.firstAge ?? 0;
-  form.value.lastAge = patient.lastAge ?? 0;
+  form.value.firstAge = patient.firstAge ?? null;
+  form.value.lastAge = patient.lastAge ?? null;
   form.value.idCard = patient.idCard ?? "";
   form.value.mobile = patient.mobile ?? "";
   form.value.height = patient.height != null ? Number(patient.height) : null;

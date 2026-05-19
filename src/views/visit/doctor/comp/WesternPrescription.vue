@@ -3,7 +3,7 @@
   - typeData 为父组件 reactive 对象引用，子组件直接操作其内部属性
   -->
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, shallowRef, watch } from "vue";
 import { Close, Plus } from "@element-plus/icons-vue";
 import {
   BqMedicineSelector,
@@ -31,13 +31,43 @@ const currentGroup = computed(
   () => props.typeData.groups[props.typeData.currentGroup]
 );
 
-// 按组号排序的药品列表
-const sortedItems = computed(() => {
-  if (!currentGroup.value?.items) return [];
-  return [...currentGroup.value.items].sort(
-    (a, b) => (a.groupNo ?? 0) - (b.groupNo ?? 0)
+// 按组号 → 序号排序的药品列表
+const sortedItems = shallowRef<PrescriptionItem[]>([]);
+
+type RowKeyItem = PrescriptionItem & { __rowKey?: string };
+let rowKeySeed = 0;
+
+const getItemRowKey = (item: PrescriptionItem) => {
+  const record = item as RowKeyItem;
+  if (!record.__rowKey) {
+    record.__rowKey = `western-row-${++rowKeySeed}`;
+  }
+  return record.__rowKey;
+};
+
+const doSort = () => {
+  const items = currentGroup.value?.items;
+  if (!items) {
+    sortedItems.value = [];
+    return;
+  }
+  const sorted = [...items].sort(
+    (a, b) =>
+      (a.groupNo ?? 0) - (b.groupNo ?? 0) || (a.sort ?? 0) - (b.sort ?? 0)
   );
-});
+  sorted.forEach((item, idx) => {
+    item.sort = idx + 1;
+  });
+  // shallowRef 靠引用比较触发，[...sorted] 保证每次都是全新数组
+  sortedItems.value = [...sorted];
+};
+
+// 药品增删时触发排序
+watch(
+  [() => props.typeData.currentGroup, () => currentGroup.value?.items?.length ?? 0],
+  () => doSort(),
+  { immediate: true }
+);
 
 // 获取最大组号
 const getMaxGroupNo = (): number => {
@@ -368,6 +398,42 @@ const getItemPriceUnitOptions = (item: PrescriptionItem) => {
   return props.unitOptions;
 };
 
+// 整数输入过滤：只允许数字
+const onIntegerInput = (
+  item: PrescriptionItem,
+  field: "sort" | "groupNo" | "days" | "totalNum",
+  value: string
+) => {
+  const filtered = value.replace(/\D/g, "");
+  if (field === "sort") {
+    const num = parseInt(filtered, 10);
+    (item as Record<string, unknown>).sort = filtered ? num : undefined;
+    doSort();
+  } else if (field === "groupNo") {
+    const num = parseInt(filtered, 10);
+    (item as Record<string, unknown>).groupNo = num > 0 ? num : undefined;
+    doSort();
+  } else {
+    (item as Record<string, unknown>)[field] = filtered;
+  }
+};
+
+// 小数输入过滤：只允许数字和一个小数点
+const onDecimalInput = (
+  item: PrescriptionItem,
+  field: "price",
+  value: string
+) => {
+  let filtered = value.replace(/[^\d.]/g, "");
+  const dotIndex = filtered.indexOf(".");
+  if (dotIndex !== -1) {
+    filtered =
+      filtered.substring(0, dotIndex + 1) +
+      filtered.substring(dotIndex + 1).replace(/\./g, "");
+  }
+  (item as Record<string, unknown>)[field] = filtered;
+};
+
 const addGroup = () => {
   props.typeData.groups.push({
     name: `处方${props.typeData.groups.length + 1}`,
@@ -419,7 +485,8 @@ const removeGroup = (index: number) => {
     <div class="prescription-table">
       <div class="table-header">
         <div class="col-operation">操作</div>
-        <div class="col-group">序号</div>
+        <div class="col-sort">序号</div>
+        <div class="col-group">组号</div>
         <div class="col-name">药品名称</div>
         <div class="col-spec">规格</div>
         <div class="col-dosage">单次用量</div>
@@ -439,7 +506,7 @@ const removeGroup = (index: number) => {
         </div>
         <div
           v-for="(item, itemIdx) in sortedItems"
-          :key="itemIdx"
+          :key="getItemRowKey(item)"
           class="prescription-item-row"
         >
           <div class="col-operation">
@@ -452,13 +519,28 @@ const removeGroup = (index: number) => {
               <el-icon><Close /></el-icon>
             </el-button>
           </div>
+          <div class="col-sort">
+            <el-input
+              :model-value="item.sort"
+              size="small"
+              style="width: 100%"
+              @update:model-value="(v: string) => onIntegerInput(item, 'sort', v)"
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
+            />
+          </div>
           <div class="col-group">
             <el-input
-              v-model.number="item.groupNo"
+              :model-value="item.groupNo"
               size="small"
-              type="number"
               style="width: 100%"
-              min="1"
+              @update:model-value="(v: string) => onIntegerInput(item, 'groupNo', v)"
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
             />
           </div>
           <div class="col-name">{{ item.itemName }}</div>
@@ -469,6 +551,10 @@ const removeGroup = (index: number) => {
               size="small"
               style="width: 100%"
               @input="calculateTotalNum(item)"
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
             />
           </div>
           <div class="col-unit">
@@ -529,25 +615,37 @@ const removeGroup = (index: number) => {
           </div>
           <div class="col-days">
             <el-input
-              v-model.number="item.days"
+              :model-value="item.days"
               size="small"
-              type="number"
-              :min="1"
               :disabled="!isGroupFirstRow(item)"
               style="width: 100%"
-              @input="
-                isGroupFirstRow(item) ? syncGroupFrequencyAndDays(item) : null
+              @update:model-value="
+                (v: string) => {
+                  onIntegerInput(item, 'days', v);
+                  isGroupFirstRow(item) && syncGroupFrequencyAndDays(item);
+                }
+              "
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
               "
             />
           </div>
           <div class="col-total">
             <el-input
-              v-model.number="item.totalNum"
+              :model-value="item.totalNum"
               size="small"
               style="width: 100%"
-              type="number"
-              min="0"
-              @input="recalcItemPrice(item)"
+              @update:model-value="
+                (v: string) => {
+                  onIntegerInput(item, 'totalNum', v);
+                  recalcItemPrice(item);
+                }
+              "
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
             />
           </div>
           <div class="col-unit">
@@ -567,15 +665,30 @@ const removeGroup = (index: number) => {
             </el-select>
           </div>
           <div class="col-note">
-            <el-input v-model="item.entrust" size="small" style="width: 100%" />
+            <el-input
+              v-model="item.entrust"
+              size="small"
+              style="width: 100%"
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
+            />
           </div>
           <div class="col-price">
             <el-input
-              v-model.number="item.price"
+              :model-value="item.price"
               size="small"
-              type="number"
-              min="0"
-              @input="recalcItemPrice(item)"
+              @update:model-value="
+                (v: string) => {
+                  onDecimalInput(item, 'price', v);
+                  recalcItemPrice(item);
+                }
+              "
+              @focus="
+                ($event: FocusEvent) =>
+                  ($event.target as HTMLInputElement).select()
+              "
             />
             <span class="price-unit-label">/{{ item.priceUnit }}</span>
           </div>
@@ -684,6 +797,11 @@ const removeGroup = (index: number) => {
         flex-shrink: 0;
       }
 
+      .col-sort {
+        width: 44px;
+        flex-shrink: 0;
+      }
+
       .col-group {
         width: 44px;
         flex-shrink: 0;
@@ -725,18 +843,6 @@ const removeGroup = (index: number) => {
       .col-days {
         width: 50px;
         flex-shrink: 0;
-
-        input[type="number"]::-webkit-outer-spin-button,
-        input[type="number"]::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          appearance: none;
-          margin: 0;
-        }
-
-        input[type="number"] {
-          -moz-appearance: textfield;
-          appearance: textfield;
-        }
       }
 
       .col-total {
@@ -771,18 +877,6 @@ const removeGroup = (index: number) => {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-        }
-
-        input[type="number"]::-webkit-outer-spin-button,
-        input[type="number"]::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          appearance: none;
-          margin: 0;
-        }
-
-        input[type="number"] {
-          -moz-appearance: textfield;
-          appearance: textfield;
         }
       }
 
@@ -840,6 +934,10 @@ const removeGroup = (index: number) => {
         :deep(.el-input__inner),
         :deep(.el-select__selected-item) {
           font-weight: 700;
+        }
+
+        .col-sort {
+          color: #409eff;
         }
 
         .col-group {

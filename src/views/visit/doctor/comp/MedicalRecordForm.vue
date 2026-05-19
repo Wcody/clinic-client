@@ -24,7 +24,7 @@ const props = defineProps<{
     bloodPressureSystolic: string;
     bloodPressureDiastolic: string;
     otherExamination: string;
-    treatmentAdvice: string;
+    advice: string;
   };
 }>();
 
@@ -129,7 +129,7 @@ const emit = defineEmits<{
 
     <el-form-item label="治疗建议" class="form-row">
       <el-input
-        v-model="props.form.treatmentAdvice"
+        v-model="props.form.advice"
         type="textarea"
         :rows="3"
         class="form-input-full"

@@ -746,17 +746,17 @@ export const getPrescriptionFullListByRegIdApi = (regId: number) => {
 
 /**
  * 生成处方PDF，返回 Blob 供前端打印预览
- * GET /prescription/printPdf?regId=xxx&showPrice=true&printCurrent=false&prescType=1
+ * GET /prescription/printPdf?regId=xxx&showPrice=true&prescId=123
+ * prescId 有值时只打印该张处方，否则打印该挂号下全部处方
  */
 export const printPrescriptionPdfApi = (
   regId: number,
   showPrice: boolean,
-  printCurrent: boolean = false,
-  prescType?: number
+  prescId?: number
 ): Promise<Blob> => {
   return http.download(
     `${PRESCRIPTION}/printPdf`,
-    { params: { regId, showPrice, printCurrent, prescType } },
+    { params: { regId, showPrice, prescId } },
     { baseURL: import.meta.env.VITE_API_BASE_URL, timeout: 240 * 1000 }
   );
 };

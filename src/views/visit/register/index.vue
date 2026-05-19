@@ -214,9 +214,9 @@ const handlePatientChange = (value: any) => {
   registrationForm.age = value.age || "";
 
   // 直接使用后端的三个字段
-  registrationForm.firstAge = value.firstAge || 0;
-  registrationForm.lastAge = value.lastAge || 0;
-  registrationForm.ageType = value.ageType || 1;
+  registrationForm.firstAge = value.firstAge ?? 0;
+  registrationForm.lastAge = value.lastAge ?? 0;
+  registrationForm.ageType = value.ageType ?? 1;
 
   patientSelected.value = true;
 };
@@ -228,20 +228,22 @@ const handlePatientSave = async (formData: any) => {
   registrationForm.gender = formData.gender === "男" ? 1 : 0;
   registrationForm.contact = formData.mobile || "";
   registrationForm.idCard = formData.idCard || "";
-  registrationForm.firstAge = Number(formData.firstAge) || 0;
-  registrationForm.lastAge = Number(formData.lastAge) || 0;
-  registrationForm.ageType = Number(formData.ageType) || 1;
+  registrationForm.firstAge = formData.firstAge != null ? Number(formData.firstAge) : 0;
+  registrationForm.lastAge = formData.lastAge != null ? Number(formData.lastAge) : 0;
+  registrationForm.ageType = formData.ageType != null ? Number(formData.ageType) : 1;
 
-  const ageYear = registrationForm.firstAge;
-  const ageMonth = registrationForm.lastAge;
+  const ageYear = formData.firstAge != null ? Number(formData.firstAge) : null;
+  const ageMonth = formData.lastAge != null ? Number(formData.lastAge) : null;
   const ageType = registrationForm.ageType;
-  let ageStr = `${ageYear}岁`;
+  const ageYearVal = ageYear ?? 0;
+  const ageMonthVal = ageMonth ?? 0;
+  let ageStr = `${ageYearVal}岁`;
   if (ageType === 1) {
-    ageStr = ageMonth > 0 ? `${ageYear}岁${ageMonth}月` : `${ageYear}岁`;
+    ageStr = ageMonthVal > 0 ? `${ageYearVal}岁${ageMonthVal}月` : `${ageYearVal}岁`;
   } else if (ageType === 2) {
-    ageStr = ageMonth > 0 ? `${ageYear}月${ageMonth}天` : `${ageYear}月`;
+    ageStr = ageMonthVal > 0 ? `${ageYearVal}月${ageMonthVal}天` : `${ageYearVal}月`;
   } else {
-    ageStr = `${ageMonth}天`;
+    ageStr = `${ageMonthVal}天`;
   }
 
   loading.value = true;
@@ -284,6 +286,7 @@ const handleItemChange = (value: string) => {
 
 // 挂号收费
 const handleRegistration = async () => {
+  if (loading.value) return;
   if (!registrationFormRef.value || !patientBasicInfoRef.value) return;
 
   // 1. 先验证左侧基本信息表单
@@ -324,10 +327,11 @@ const handleRegistration = async () => {
     itemOptions.value.find(i => i.value === registrationForm.item)?.label ??
     registrationForm.item;
 
-  // 根据ageType生成年龄显示字符串
-  const firstAge = Number(registrationForm.firstAge);
-  const lastAge = Number(registrationForm.lastAge);
-  const ageType = registrationForm.ageType;
+  // 以 BasicInfo 表单的当前值为准（用户填写的实际值），registrationForm 作为兜底
+  const basicInfoForm = patientBasicInfoRef.value?.form;
+  const firstAge = basicInfoForm?.firstAge != null ? Number(basicInfoForm.firstAge) : Number(registrationForm.firstAge);
+  const lastAge = basicInfoForm?.lastAge != null ? Number(basicInfoForm.lastAge) : Number(registrationForm.lastAge);
+  const ageType = basicInfoForm?.ageType ?? registrationForm.ageType;
 
   let ageStr: string;
   if (ageType === 1) {
@@ -374,8 +378,8 @@ const handleRegistration = async () => {
     await saveRegistrationApi(dto);
     ElMessage.success("挂号收费成功！");
     handleReset();
-    // 切换到挂号列表页签，自动刷新数据
     activeTab.value = "list";
+    handleQuery();
   } catch (e: any) {
     ElMessage.error(e?.message ?? "挂号失败，请重试");
   } finally {
@@ -390,7 +394,7 @@ const handleReset = () => {
   registrationFormRef.value.resetFields();
 
   if (patientBasicInfoRef.value) {
-    patientBasicInfoRef.value.clearValidate();
+    patientBasicInfoRef.value.reset();
   }
 
   // 重置后恢复API加载的默认值
