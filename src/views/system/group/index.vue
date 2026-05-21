@@ -15,7 +15,13 @@ defineOptions({
 });
 
 const route = useRoute();
-const initKind = route.fullPath == "/sysm/group/index" ? 0 : 1;
+const routeKind = Number(route.meta?.kind);
+const initKind =
+  routeKind === 0 || routeKind === 1
+    ? routeKind
+    : route.fullPath.includes("/customer")
+      ? 1
+      : 0;
 
 const formRef = ref();
 const tableRef = ref();
@@ -57,8 +63,8 @@ const {
           clearable
           class="!w-[180px]"
         >
-          <el-option label="启用" :value="1" />
-          <el-option label="禁用" :value="0" />
+          <el-option label="启用" :value="true" />
+          <el-option label="禁用" :value="false" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -142,7 +148,8 @@ const {
               新增
             </el-button>
             <el-popconfirm
-              :title="`是否确认删除${getTitle()}名称为${row.name}的这条数据`"
+              :width="340"
+              :title="`确认删除${getTitle()}「${row.name}」？存在子组或已归属对象时系统会拒绝删除。`"
               @confirm="handleDelete(row)"
             >
               <template #reference>

@@ -1,0 +1,1352 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>全科医生系统 2.0 产品与服务方案</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #5f6f83;
+        --line: #d8e0ea;
+        --paper: #ffffff;
+        --soft: #f5f8fb;
+        --brand: #0f766e;
+        --brand-dark: #134e4a;
+        --blue: #2563eb;
+        --green: #2f855a;
+        --amber: #b7791f;
+        --shadow: 0 18px 44px rgba(20, 34, 56, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: #eef4f7;
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        line-height: 1.68;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 22px 54px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand img {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        object-fit: cover;
+      }
+
+      .brand-text strong {
+        display: block;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .brand-text span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .contact-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 5px 14px;
+        border: 1px solid rgba(15, 118, 110, 0.28);
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .hero {
+        overflow: hidden;
+        border: 1px solid rgba(15, 118, 110, 0.2);
+        border-radius: 20px;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.1), transparent 42%),
+          linear-gradient(315deg, rgba(37, 99, 235, 0.08), transparent 45%),
+          #ffffff;
+        box-shadow: var(--shadow);
+      }
+
+      .hero-inner {
+        display: grid;
+        grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr);
+        gap: 28px;
+        padding: 42px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: #e8f7f4;
+        color: var(--brand);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 18px 0 16px;
+        font-size: clamp(34px, 4.5vw, 58px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        max-width: 700px;
+        margin: 0;
+        color: #475467;
+        font-size: 17px;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 26px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 9px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .btn.primary {
+        background: var(--brand);
+        color: #ffffff;
+      }
+
+      .btn.secondary {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #344054;
+      }
+
+      .hero-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 18px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        border-radius: 16px;
+        background: #f8fbff;
+        padding: 24px;
+      }
+
+      .hero-card h2 {
+        margin: 0;
+        color: var(--blue);
+        font-size: 18px;
+      }
+
+      .hero-card .price {
+        margin: 10px 0 6px;
+        font-size: 42px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .hero-card .price small {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .hero-card p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #175cd3;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 22px 0;
+      }
+
+      .nav a {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.88);
+        color: #344054;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .section {
+        margin-top: 22px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--paper);
+        box-shadow: 0 12px 30px rgba(20, 34, 56, 0.05);
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .section h2 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.25;
+      }
+
+      .section-lead {
+        max-width: 760px;
+        margin: 7px 0 0;
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 30px;
+        padding: 0 11px;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .value-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .value-card,
+      .plan,
+      .service-card,
+      .step,
+      .faq-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+      }
+
+      .value-card {
+        min-height: 184px;
+        padding: 18px;
+      }
+
+      .value-card .icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+        background: #e8f7f4;
+        color: var(--brand);
+        font-size: 20px;
+        font-weight: 900;
+      }
+
+      .value-card h3,
+      .service-card h3,
+      .faq-item h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .value-card p,
+      .service-card p,
+      .faq-item p,
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .plan {
+        position: relative;
+        display: flex;
+        min-height: 585px;
+        flex-direction: column;
+        padding: 20px;
+      }
+
+      .plan.recommended {
+        border: 2px solid var(--brand);
+        box-shadow: 0 18px 38px rgba(15, 118, 110, 0.13);
+      }
+
+      .plan-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .plan h3 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .badge {
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #ecfdf3;
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .plan-price {
+        margin: 14px 0 4px;
+        font-size: 32px;
+        font-weight: 900;
+        line-height: 1.05;
+      }
+
+      .plan-price small {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .annual {
+        min-height: 34px;
+        color: var(--brand);
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .origin-price {
+        color: #8a96a8;
+        font-size: 13px;
+        text-decoration: line-through;
+      }
+
+      .promo-price {
+        margin-top: 3px;
+        color: #b42318;
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .fit {
+        min-height: 76px;
+        margin: 10px 0 16px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      .plan ul {
+        flex: 1;
+        color: #465568;
+        font-size: 14px;
+      }
+
+      .plan-note {
+        margin-top: 16px;
+        padding-top: 13px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f1f5f9;
+        color: #344054;
+        font-weight: 900;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .price-strong {
+        color: var(--brand);
+        font-weight: 900;
+      }
+
+      .service-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .service-card {
+        padding: 18px;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .step {
+        padding: 16px;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--brand);
+      }
+
+      .notice {
+        margin-top: 16px;
+        padding: 15px 18px;
+        border-left: 5px solid var(--brand);
+        border-radius: 10px;
+        background: #effaf8;
+        color: var(--brand-dark);
+      }
+
+      .notice.amber {
+        border-left-color: var(--amber);
+        background: #fffbeb;
+        color: #713f12;
+      }
+
+      .promo-banner {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+        gap: 18px;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 20px;
+        border: 1px solid #f6c76b;
+        border-radius: 14px;
+        background:
+          linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.92)),
+          #fffbeb;
+      }
+
+      .promo-banner h3 {
+        margin: 0 0 8px;
+        color: #7a2e0e;
+        font-size: 24px;
+        line-height: 1.25;
+      }
+
+      .promo-banner p {
+        margin: 0;
+        color: #713f12;
+      }
+
+      .promo-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .promo-box {
+        min-height: 76px;
+        padding: 12px;
+        border: 1px solid rgba(180, 83, 9, 0.22);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.74);
+      }
+
+      .promo-box strong {
+        display: block;
+        color: #b42318;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .promo-box span {
+        display: block;
+        margin-top: 5px;
+        color: #713f12;
+        font-size: 12px;
+      }
+
+      .countdown {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .countdown span {
+        min-width: 42px;
+        padding: 4px 8px;
+        border-radius: 8px;
+        background: #7a2e0e;
+        color: #fff7ed;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .faq-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .faq-item {
+        padding: 18px;
+      }
+
+      .cta {
+        margin-top: 22px;
+        overflow: hidden;
+        border-radius: 18px;
+        background: #102a43;
+        color: #ffffff;
+      }
+
+      .cta-inner {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 24px;
+        padding: 32px;
+      }
+
+      .cta h2 {
+        margin: 0 0 10px;
+        font-size: 28px;
+      }
+
+      .cta p {
+        margin: 0;
+        color: #dbeafe;
+      }
+
+      .cta-panel {
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 18px;
+      }
+
+      .cta-panel strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #5eead4;
+        font-size: 18px;
+      }
+
+      .footer {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      @media (max-width: 1080px) {
+        .hero-inner,
+        .cta-inner {
+          grid-template-columns: 1fr;
+        }
+
+        .value-grid,
+        .plans,
+        .steps {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .promo-banner {
+          grid-template-columns: 1fr;
+        }
+
+        .service-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 16px 12px 38px;
+        }
+
+        .topbar,
+        .section-head {
+          display: block;
+        }
+
+        .contact-pill {
+          margin-top: 12px;
+        }
+
+        .hero-inner,
+        .section,
+        .cta-inner {
+          padding: 20px;
+        }
+
+        .value-grid,
+        .plans,
+        .service-grid,
+        .steps,
+        .promo-meta,
+        .faq-grid {
+          grid-template-columns: 1fr;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .page {
+          max-width: none;
+          padding: 0;
+        }
+
+        .nav,
+        .hero-actions {
+          display: none;
+        }
+
+        .hero,
+        .section,
+        .cta {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="brand">
+          <img src="./logo128.png" alt="全科医生系统 2.0" />
+          <div class="brand-text">
+            <strong>全科医生系统 2.0</strong>
+            <span>面向中小诊所的一体化经营管理系统</span>
+          </div>
+        </div>
+        <div class="contact-pill">产品方案与服务报价</div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-inner">
+          <div>
+            <span class="eyebrow">让诊所日常业务更清楚、更顺手、更好核对</span>
+            <h1>从挂号接诊到收费药房，一套系统跑完整个门诊流程</h1>
+            <p class="hero-copy">
+              全科医生系统 2.0 覆盖诊所日常高频业务：患者挂号、医生接诊、病历处方、收费退费、药品库存、知识库查询、统计报表、人员权限和系统参数维护。
+              适合个体诊所、综合门诊、中医馆和小型连锁门店使用。
+            </p>
+            <div class="hero-actions">
+              <a class="btn primary" href="#plans">查看版本价格</a>
+              <a class="btn secondary" href="#delivery">了解上线流程</a>
+            </div>
+          </div>
+
+          <aside class="hero-card">
+            <div>
+              <h2>推荐选择</h2>
+              <div class="price">标准版 <small>¥3,990 / 年</small></div>
+              <p>
+                适合大多数中小诊所，包含日常经营需要的完整闭环：挂号、接诊、处方、收费、退费、药房库存和统计报表。
+              </p>
+            </div>
+            <div class="chips">
+              <span class="chip">支持试用</span>
+              <span class="chip">远程上线</span>
+              <span class="chip">数据导入</span>
+              <span class="chip">持续升级</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <nav class="nav" aria-label="页面目录">
+        <a href="#value">系统价值</a>
+        <a href="#plans">版本价格</a>
+        <a href="#compare">版本对比</a>
+        <a href="#knowledge">知识库与模板</a>
+        <a href="#services">增值服务</a>
+        <a href="#private-deploy">私有化部署</a>
+        <a href="#delivery">上线流程</a>
+        <a href="#faq">常见问题</a>
+      </nav>
+
+      <section id="value" class="section">
+        <div class="section-head">
+          <div>
+            <h2>系统可以帮助诊所解决什么</h2>
+            <p class="section-lead">
+              诊所每天最重要的不是“多一个软件”，而是把患者、处方、费用、药品和经营数据串起来，减少重复录入和人工核对。
+            </p>
+          </div>
+          <span class="tag">核心价值</span>
+        </div>
+
+        <div class="value-grid">
+          <div class="value-card">
+            <div class="icon">1</div>
+            <h3>门诊流程完整闭环</h3>
+            <p>从挂号、待接诊、医生开方，到收费、退费和发药，业务状态清晰，减少漏单和错单。</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">2</div>
+            <h3>处方与项目更规范</h3>
+            <p>支持西药/中成药、中药处方、检查项目、治疗项目和附加费用，医生开单更方便。</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">3</div>
+            <h3>药房库存更好管理</h3>
+            <p>支持药品资料、入库、出库、库存查询、零售售药和库存预警，方便日常盘点和补货。</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">4</div>
+            <h3>经营数据随时查看</h3>
+            <p>首页概览、工作量、药品、项目和财务统计，帮助诊所及时了解收入、业务量和药品使用情况。</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">5</div>
+            <h3>中医知识辅助查询</h3>
+            <p>内置中医知识库和中医临床诊治查询，支持按专科、首字母和疾病名称检索，查看辨证治疗、推荐方剂和名医经验方。</p>
+          </div>
+          <div class="value-card">
+            <div class="icon">6</div>
+            <h3>常用模板沉淀复用</h3>
+            <p>支持病历模板和处方模板，常见主诉、病史、体征、医嘱和用药方案可沉淀复用，减少医生重复录入。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="plans" class="section">
+        <div class="section-head">
+          <div>
+            <h2>版本价格</h2>
+            <p class="section-lead">
+              可根据诊所规模、账号数量、库存管理复杂度和统计需求选择合适版本。以下价格为标准产品服务报价。
+            </p>
+          </div>
+          <span class="tag">报价方案</span>
+        </div>
+
+        <div class="promo-banner">
+          <div>
+            <h3>限时首年 5 折</h3>
+            <p>
+              2026 年 6 月 1 日 00:00 前完成签约或付款，可享 SaaS 年费首年 5 折。活动仅限软件订阅年费，私有化部署、数据迁移、培训、接口对接和定制开发不参与。
+            </p>
+            <div class="countdown" aria-label="活动倒计时">
+              <span id="promo-days">--天</span>
+              <span id="promo-hours">--时</span>
+              <span id="promo-minutes">--分</span>
+              <span id="promo-seconds">--秒</span>
+            </div>
+          </div>
+          <div class="promo-meta">
+            <div class="promo-box">
+              <strong>首年半价</strong>
+              <span>第二年起按所选版本标准年费续费</span>
+            </div>
+            <div class="promo-box">
+              <strong>6 月 1 日前</strong>
+              <span>以正式合同或付款时间为准</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="plans">
+          <article class="plan">
+            <div class="plan-head">
+              <h3>基础版</h3>
+            </div>
+            <div class="plan-price">¥199 <small>/ 月</small></div>
+            <div class="annual">
+              <div class="origin-price">原价 ¥1,990 / 年</div>
+              <div class="promo-price">限时首年 ¥995 / 年</div>
+            </div>
+            <p class="fit">适合 1-2 名医生、刚开始使用系统的小型诊所。</p>
+            <ul>
+              <li>1 个诊所，最多 3 个账号</li>
+              <li>患者挂号、待接诊、基础病历</li>
+              <li>西药/中成药处方、中药处方</li>
+              <li>基础收费、退费记录</li>
+              <li>药品资料和库存查询</li>
+              <li>科室、人员、角色基础维护</li>
+              <li>病历模板、处方模板基础复用</li>
+              <li>系统名称、Logo、打印参数维护</li>
+            </ul>
+            <div class="plan-note">适合先把日常业务从纸质记录迁移到系统。</div>
+          </article>
+
+          <article class="plan recommended">
+            <div class="plan-head">
+              <h3>标准版</h3>
+              <span class="badge">推荐</span>
+            </div>
+            <div class="plan-price">¥399 <small>/ 月</small></div>
+            <div class="annual">
+              <div class="origin-price">原价 ¥3,990 / 年</div>
+              <div class="promo-price">限时首年 ¥1,995 / 年</div>
+            </div>
+            <p class="fit">适合多数中小诊所，覆盖门诊日常经营完整闭环。</p>
+            <ul>
+              <li>1 个诊所，最多 8 个账号</li>
+              <li>完整挂号、接诊、病历、处方流程</li>
+              <li>检查项目、治疗项目、附加费开单</li>
+              <li>收费、退费、收费记录核对</li>
+              <li>药品入库、出库、库存、零售售药</li>
+              <li>处方模板、历史处方复用</li>
+              <li>中医知识库、中医临床诊治查询</li>
+              <li>首页概览、药品、项目、财务基础统计</li>
+              <li>角色菜单权限和帮助说明</li>
+            </ul>
+            <div class="plan-note">推荐大多数诊所选择，功能完整，价格也更均衡。</div>
+          </article>
+
+          <article class="plan">
+            <div class="plan-head">
+              <h3>专业版</h3>
+            </div>
+            <div class="plan-price">¥699 <small>/ 月</small></div>
+            <div class="annual">
+              <div class="origin-price">原价 ¥6,990 / 年</div>
+              <div class="promo-price">限时首年 ¥3,495 / 年</div>
+            </div>
+            <p class="fit">适合药品较多、库存更复杂、希望加强经营分析的诊所。</p>
+            <ul>
+              <li>1 个诊所，最多 20 个账号</li>
+              <li>包含标准版全部功能</li>
+              <li>更完整的库存预警和药品统计</li>
+              <li>医生工作量、项目收入、财务趋势分析</li>
+              <li>更细的岗位权限配置</li>
+              <li>病历模板、处方模板分类维护</li>
+              <li>中医知识库辅助查询</li>
+              <li>上线资料整理支持</li>
+              <li>包含 1 次远程培训</li>
+              <li>优先响应服务</li>
+            </ul>
+            <div class="plan-note">适合已经有稳定业务量、需要更精细化管理的诊所。</div>
+          </article>
+
+          <article class="plan">
+            <div class="plan-head">
+              <h3>连锁经营版</h3>
+            </div>
+            <div class="plan-price">¥999 <small>/ 月起</small></div>
+            <div class="annual">
+              <div class="origin-price">原价 ¥9,990 / 年起</div>
+              <div class="promo-price">限时首年 ¥4,995 / 年起</div>
+            </div>
+            <p class="fit">适合 2 家以上门店，需要统一管理多个诊所的客户。</p>
+            <ul>
+              <li>首诊所含 20 个账号</li>
+              <li>新增分店按门店数量报价</li>
+              <li>统一基础资料初始化</li>
+              <li>各门店独立维护人员、参数和业务数据</li>
+              <li>支持门店权限划分</li>
+              <li>统一维护常用病历模板和处方模板</li>
+              <li>上线辅导和季度使用复盘</li>
+              <li>可按门店数量提供阶梯优惠</li>
+            </ul>
+            <div class="plan-note">适合门店扩张阶段，需要统一系统和统一管理口径。</div>
+          </article>
+        </div>
+
+        <div class="notice">
+          年付价格更优惠，适合正式使用；月付适合短期试用或过渡期。限时 5 折仅适用于首年 SaaS 软件订阅年费，最终服务内容以双方确认的合同或报价单为准。
+        </div>
+      </section>
+
+      <section id="compare" class="section">
+        <div class="section-head">
+          <div>
+            <h2>功能对比</h2>
+            <p class="section-lead">
+              不同版本的核心区别主要在账号数量、库存管理深度、统计分析能力和服务响应等级。
+            </p>
+          </div>
+          <span class="tag">功能清单</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>功能模块</th>
+              <th>基础版</th>
+              <th>标准版</th>
+              <th>专业版</th>
+              <th>连锁经营版</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>账号数量</td>
+              <td>3 个</td>
+              <td>8 个</td>
+              <td>20 个</td>
+              <td>按门店方案</td>
+            </tr>
+            <tr>
+              <td>挂号、接诊、病历</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>西药/中成药、中药处方</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>检查、治疗、附加费</td>
+              <td>基础支持</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>收费与退费</td>
+              <td>基础支持</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>药品入库、出库、库存</td>
+              <td>基础支持</td>
+              <td>支持</td>
+              <td>加强支持</td>
+              <td>加强支持</td>
+            </tr>
+            <tr>
+              <td>零售售药</td>
+              <td>不含</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>处方模板与历史处方</td>
+              <td>基础支持</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>病历模板</td>
+              <td>基础支持</td>
+              <td>支持</td>
+              <td>分类维护</td>
+              <td>统一模板规划</td>
+            </tr>
+            <tr>
+              <td>中医知识库</td>
+              <td>不含</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>中医临床诊治</td>
+              <td>不含</td>
+              <td>支持</td>
+              <td>支持</td>
+              <td>支持</td>
+            </tr>
+            <tr>
+              <td>统计报表</td>
+              <td>基础概览</td>
+              <td>基础统计</td>
+              <td>经营分析</td>
+              <td>门店汇总规划</td>
+            </tr>
+            <tr>
+              <td>远程培训</td>
+              <td>可选</td>
+              <td>可选</td>
+              <td>含 1 次</td>
+              <td>含上线辅导</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="knowledge" class="section">
+        <div class="section-head">
+          <div>
+            <h2>知识库与模板能力</h2>
+            <p class="section-lead">
+              除了门诊经营流程，系统也提供医生日常诊疗中常用的知识查询和模板复用能力，帮助医生更快完成病历与处方录入。
+            </p>
+          </div>
+          <span class="tag">辅助诊疗</span>
+        </div>
+
+        <div class="service-grid">
+          <div class="service-card">
+            <h3>中医知识库</h3>
+            <p>支持按专科、首字母和疾病名称检索中医疾病，查看疾病概述、辨证治疗、推荐方剂和名医经验方。</p>
+          </div>
+          <div class="service-card">
+            <h3>中医临床诊治</h3>
+            <p>提供中医疾病诊治资料查询，辅助医生在接诊过程中快速参考常见疾病的治疗思路和方药组成。</p>
+          </div>
+          <div class="service-card">
+            <h3>病历模板</h3>
+            <p>常见主诉、现病史、既往史、体格检查、辅助检查和治疗建议可保存为模板，复诊和常见病录入更快。</p>
+          </div>
+          <div class="service-card">
+            <h3>处方模板</h3>
+            <p>支持西药/中成药处方和中药处方模板，常用用药方案可按个人或诊所沉淀，开方时直接调用。</p>
+          </div>
+          <div class="service-card">
+            <h3>历史方案复用</h3>
+            <p>医生可查看患者历史病历和历史处方，在复诊场景中快速参考过往诊断、用药和治疗方案。</p>
+          </div>
+          <div class="service-card">
+            <h3>诊所共享经验</h3>
+            <p>诊所常用模板可作为团队经验沉淀，新医生也能更快熟悉本诊所常见病种和常用处方习惯。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="services" class="section">
+        <div class="section-head">
+          <div>
+            <h2>可选增值服务</h2>
+            <p class="section-lead">
+              根据诊所实际情况，可以选择数据迁移、培训、私有部署、打印模板等服务，让系统更快贴合现有工作方式。
+            </p>
+          </div>
+          <span class="tag">增值服务</span>
+        </div>
+
+        <div class="service-grid">
+          <div class="service-card">
+            <h3>数据迁移</h3>
+            <p>药品、患者、库存、历史资料等数据可按模板导入。价格根据数据量和整理难度评估。</p>
+            <p class="price-strong">¥1,500 起</p>
+          </div>
+          <div class="service-card">
+            <h3>远程上线辅导</h3>
+            <p>协助完成科室、人员、角色、药品、费用项目、系统参数等基础配置。</p>
+            <p class="price-strong">¥1,000 起</p>
+          </div>
+          <div class="service-card">
+            <h3>现场培训</h3>
+            <p>面向医生、收费员、药房人员和管理员进行现场培训，适合多人同时上线。</p>
+            <p class="price-strong">按城市和天数报价</p>
+          </div>
+          <div class="service-card">
+            <h3>私有化部署</h3>
+            <p>适合有本地服务器、内网部署或数据独立部署要求的客户。</p>
+            <p class="price-strong">¥39,800 起</p>
+          </div>
+          <div class="service-card">
+            <h3>打印模板定制</h3>
+            <p>可根据诊所现有处方笺、收费单、药品单据样式定制打印模板。</p>
+            <p class="price-strong">¥1,000 起 / 项</p>
+          </div>
+          <div class="service-card">
+            <h3>短信/小程序扩展</h3>
+            <p>可扩展预约、提醒、患者通知、复诊提醒等患者服务场景。</p>
+            <p class="price-strong">按实际方案报价</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="private-deploy" class="section">
+        <div class="section-head">
+          <div>
+            <h2>私有化部署方案</h2>
+            <p class="section-lead">
+              如果诊所有内网使用、本地服务器、数据独立存放或专属运维要求，可以选择私有化部署。私有化部署属于项目交付，费用包含环境部署、系统配置、上线协助和后续维护支持。
+            </p>
+          </div>
+          <span class="tag">独立部署</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>部署方案</th>
+              <th>建议价格</th>
+              <th>适用场景</th>
+              <th>包含服务</th>
+              <th>后续维护</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>单诊所私有化部署</td>
+              <td class="price-strong">¥39,800 起</td>
+              <td>单体诊所，需要本地服务器或内网独立使用</td>
+              <td>系统部署、基础配置、管理员账号、基础资料初始化指导、1 次远程培训</td>
+              <td>次年起 ¥6,000/年起</td>
+            </tr>
+            <tr>
+              <td>小型连锁私有化部署</td>
+              <td class="price-strong">¥68,000 起</td>
+              <td>2 家以上门店，需要统一部署和多诊所管理</td>
+              <td>多诊所配置、门店初始化、权限配置、远程上线辅导、管理员培训</td>
+              <td>按合同额 15%-20%/年</td>
+            </tr>
+            <tr>
+              <td>专属定制交付</td>
+              <td class="price-strong">¥128,000 起</td>
+              <td>有专属流程、接口对接、特殊报表或深度定制需求</td>
+              <td>需求确认、定制开发、测试验收、部署上线、专属交付支持</td>
+              <td>单独签订维护服务</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="notice">
+          私有化部署价格会根据服务器环境、门店数量、数据迁移量、接口对接和定制范围评估。正式报价前建议先做一次部署环境和需求确认。
+        </div>
+      </section>
+
+      <section id="delivery" class="section">
+        <div class="section-head">
+          <div>
+            <h2>上线流程</h2>
+            <p class="section-lead">
+              标准 SaaS 版本通常可以远程上线。资料准备越完整，上线越快。
+            </p>
+          </div>
+          <span class="tag">交付流程</span>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <strong>1. 确认版本</strong>
+            <p>根据诊所人数、门店数量、药品库存和统计需求确认购买版本。</p>
+          </div>
+          <div class="step">
+            <strong>2. 开通账号</strong>
+            <p>创建诊所空间和管理员账号，配置系统名称、Logo 和基础参数。</p>
+          </div>
+          <div class="step">
+            <strong>3. 初始化资料</strong>
+            <p>导入或维护科室、人员、角色、药品、挂号费、项目、诊断字典和常用模板。</p>
+          </div>
+          <div class="step">
+            <strong>4. 培训试跑</strong>
+            <p>用测试患者走一遍挂号、接诊、处方、收费、发药和统计流程。</p>
+          </div>
+          <div class="step">
+            <strong>5. 正式使用</strong>
+            <p>上线后根据实际使用情况调整权限、模板、打印和基础资料。</p>
+          </div>
+        </div>
+
+        <div class="notice amber">
+          建议正式上线前准备：诊所名称、Logo、科室名单、人员名单、药品清单、收费项目、常用诊断、常用病历模板、常用处方模板和打印样式。
+        </div>
+      </section>
+
+      <section id="faq" class="section">
+        <div class="section-head">
+          <div>
+            <h2>常见问题</h2>
+            <p class="section-lead">
+              以下是客户在购买前经常关心的问题。
+            </p>
+          </div>
+          <span class="tag">FAQ</span>
+        </div>
+
+        <div class="faq-grid">
+          <div class="faq-item">
+            <h3>可以先试用吗？</h3>
+            <p>可以。建议先使用测试账号走完整业务流程，再根据实际使用情况确认版本。</p>
+          </div>
+          <div class="faq-item">
+            <h3>以前的数据能导入吗？</h3>
+            <p>可以按模板导入常见基础资料。历史数据如果格式复杂，需要先评估数据质量和整理工作量。</p>
+          </div>
+          <div class="faq-item">
+            <h3>系统名称和 Logo 能换成自己的诊所吗？</h3>
+            <p>可以。系统支持维护诊所自己的系统名称、Logo 和打印展示信息。</p>
+          </div>
+          <div class="faq-item">
+            <h3>多人能同时使用吗？</h3>
+            <p>可以。不同版本包含不同账号数量，也可以根据诊所规模增加账号或升级版本。</p>
+          </div>
+          <div class="faq-item">
+            <h3>能否私有化部署？</h3>
+            <p>可以。单诊所私有化部署 ¥39,800 起，小型连锁私有化部署 ¥68,000 起，具体费用按部署环境、门店数量和定制范围评估。</p>
+          </div>
+          <div class="faq-item">
+            <h3>限时 5 折怎么计算？</h3>
+            <p>2026 年 6 月 1 日 00:00 前完成签约或付款，可享首年 SaaS 年费 5 折；第二年起按所选版本标准年费续费。</p>
+          </div>
+          <div class="faq-item">
+            <h3>后续会持续升级吗？</h3>
+            <p>标准 SaaS 服务包含持续优化和常规更新。涉及客户专属流程的定制功能会单独评估。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="cta-inner">
+          <div>
+            <h2>建议从标准版开始试用</h2>
+            <p>
+              标准版覆盖诊所日常业务主流程，既能快速上线，也方便诊所判断系统是否适合自己的工作方式。
+              2026 年 6 月 1 日 00:00 前签约或付款，标准版首年可按 ¥1,995 / 年购买；如果药品多、人员多、统计要求更高，可以升级专业版。
+            </p>
+          </div>
+          <div class="cta-panel">
+            <strong>推荐方案：标准版限时首年 ¥1,995 / 年</strong>
+            <p>包含挂号、接诊、处方、收费、退费、药房库存、知识库查询、模板复用、统计报表、人员权限和系统参数维护。</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">
+        全科医生系统 2.0 产品与服务方案 · 报价有效期以正式报价单为准
+      </div>
+    </main>
+    <script>
+      (() => {
+        const deadline = new Date("2026-06-01T00:00:00+08:00").getTime();
+        const nodes = {
+          days: document.getElementById("promo-days"),
+          hours: document.getElementById("promo-hours"),
+          minutes: document.getElementById("promo-minutes"),
+          seconds: document.getElementById("promo-seconds")
+        };
+
+        const pad = value => String(value).padStart(2, "0");
+
+        const render = () => {
+          const diff = deadline - Date.now();
+          if (diff <= 0) {
+            nodes.days.textContent = "活动";
+            nodes.hours.textContent = "已";
+            nodes.minutes.textContent = "结束";
+            nodes.seconds.textContent = "";
+            return;
+          }
+
+          const days = Math.floor(diff / 86400000);
+          const hours = Math.floor((diff % 86400000) / 3600000);
+          const minutes = Math.floor((diff % 3600000) / 60000);
+          const seconds = Math.floor((diff % 60000) / 1000);
+
+          nodes.days.textContent = `${days}天`;
+          nodes.hours.textContent = `${pad(hours)}时`;
+          nodes.minutes.textContent = `${pad(minutes)}分`;
+          nodes.seconds.textContent = `${pad(seconds)}秒`;
+        };
+
+        render();
+        window.setInterval(render, 1000);
+      })();
+    </script>
+  </body>
+</html>

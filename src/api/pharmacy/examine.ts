@@ -12,6 +12,7 @@ import {
  * 检查检验项目实体类型定义
  */
 export type BQExamineItemEntityType = {
+  id?: number;
   name: string;
   pinyin?: string;
   seq?: string;
@@ -19,6 +20,8 @@ export type BQExamineItemEntityType = {
   sellingPrice?: string;
   costPrice?: string;
   status?: string;
+  isExecProject?: boolean;
+  tenantInitData?: boolean;
 } & BQBaseEntityType;
 
 /**
@@ -35,6 +38,8 @@ export const getExamineItemEntityDefault: (
     sellingPrice: row?.sellingPrice ?? "",
     costPrice: row?.costPrice ?? "",
     status: row?.status ?? "启用",
+    isExecProject: row?.isExecProject ?? false,
+    tenantInitData: row?.tenantInitData ?? true,
     ...getBaseEntityDefault(row)
   };
 };

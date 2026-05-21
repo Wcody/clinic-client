@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>全科医生系统 2.0 售价路线规划</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #182230;
+        --muted: #667085;
+        --line: #d9e2ec;
+        --paper: #ffffff;
+        --soft: #f5f7fb;
+        --teal: #0f766e;
+        --green: #2e7d32;
+        --amber: #b7791f;
+        --blue: #2563eb;
+        --red: #b42318;
+        --violet: #6d28d9;
+        --shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #eef3f8;
+        color: var(--ink);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        line-height: 1.68;
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .page {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 28px 24px 56px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(15, 118, 110, 0.18);
+        border-radius: 18px;
+        background:
+          linear-gradient(135deg, rgba(15, 118, 110, 0.1), transparent 38%),
+          linear-gradient(315deg, rgba(37, 99, 235, 0.09), transparent 42%),
+          #ffffff;
+        box-shadow: var(--shadow);
+        padding: 38px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+        gap: 28px;
+        align-items: stretch;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 30px;
+        padding: 4px 12px;
+        border: 1px solid rgba(15, 118, 110, 0.22);
+        border-radius: 999px;
+        background: rgba(240, 253, 250, 0.9);
+        color: var(--teal);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin: 18px 0 14px;
+        font-size: clamp(32px, 4vw, 56px);
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .hero p {
+        max-width: 740px;
+        margin: 0;
+        color: #475467;
+        font-size: 17px;
+      }
+
+      .hero-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .metric,
+      .source-card,
+      .plan,
+      .section,
+      .mini-card,
+      .timeline-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--paper);
+      }
+
+      .metric {
+        min-height: 106px;
+        padding: 16px;
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--teal);
+        font-size: 26px;
+        line-height: 1.1;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero-side {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 22px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        border-radius: 16px;
+        background: #f8fbff;
+      }
+
+      .recommend-title {
+        color: var(--blue);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .recommend-price {
+        margin: 8px 0 4px;
+        font-size: 38px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .recommend-price small {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: #edf4ff;
+        color: #175cd3;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 24px 0;
+      }
+
+      .toc a {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.82);
+        color: #344054;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .section {
+        margin-top: 22px;
+        padding: 26px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .section h2 {
+        margin: 0;
+        font-size: 25px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      .section-lead {
+        max-width: 760px;
+        margin: 7px 0 0;
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 30px;
+        padding: 0 11px;
+        border-radius: 8px;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .tag.teal {
+        background: var(--teal);
+      }
+
+      .tag.blue {
+        background: var(--blue);
+      }
+
+      .tag.amber {
+        background: var(--amber);
+      }
+
+      .tag.green {
+        background: var(--green);
+      }
+
+      .source-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .source-card {
+        min-height: 168px;
+        padding: 16px;
+        background: #fcfcfd;
+      }
+
+      .source-card h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+
+      .source-card .price {
+        color: var(--teal);
+        font-size: 21px;
+        font-weight: 900;
+      }
+
+      .source-card p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .strategy-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 14px;
+      }
+
+      .mini-card {
+        padding: 18px;
+      }
+
+      .mini-card h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .mini-card p,
+      .mini-card li {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .plans {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .plan {
+        position: relative;
+        display: flex;
+        min-height: 560px;
+        flex-direction: column;
+        padding: 20px;
+        background: #ffffff;
+      }
+
+      .plan.featured {
+        border: 2px solid var(--teal);
+        box-shadow: 0 18px 38px rgba(15, 118, 110, 0.12);
+      }
+
+      .plan-name {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 36px;
+        margin-bottom: 10px;
+      }
+
+      .plan-name h3 {
+        margin: 0;
+        font-size: 19px;
+      }
+
+      .badge {
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #ecfdf3;
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .plan-price {
+        margin: 10px 0;
+        color: var(--ink);
+        font-size: 30px;
+        font-weight: 900;
+      }
+
+      .plan-price small {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .annual {
+        min-height: 34px;
+        color: var(--teal);
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .fit {
+        min-height: 72px;
+        margin: 10px 0 16px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      .plan ul {
+        flex: 1;
+        color: #475467;
+        font-size: 14px;
+      }
+
+      .plan-footer {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f1f5f9;
+        color: #344054;
+        font-weight: 800;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .price-strong {
+        color: var(--teal);
+        font-weight: 900;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .timeline-item {
+        padding: 18px;
+      }
+
+      .timeline-item strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--teal);
+        font-size: 16px;
+      }
+
+      .timeline-item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .callout {
+        margin-top: 16px;
+        padding: 16px 18px;
+        border-left: 5px solid var(--teal);
+        border-radius: 10px;
+        background: #f0fdfa;
+        color: #134e4a;
+      }
+
+      .warning {
+        border-left-color: var(--amber);
+        background: #fffbeb;
+        color: #713f12;
+      }
+
+      .danger {
+        border-left-color: var(--red);
+        background: #fff5f5;
+        color: #7a271a;
+      }
+
+      .quote-box {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .quote-main {
+        border-radius: 14px;
+        background: #102a43;
+        color: #ffffff;
+        padding: 24px;
+      }
+
+      .quote-main h3 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 24px;
+      }
+
+      .quote-main p {
+        margin: 12px 0 0;
+        color: #dbeafe;
+      }
+
+      .quote-main .number {
+        margin-top: 18px;
+        color: #5eead4;
+        font-size: 38px;
+        font-weight: 900;
+      }
+
+      .source-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 10px;
+      }
+
+      .source-link {
+        display: block;
+        padding: 13px 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #ffffff;
+      }
+
+      .source-link strong {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--ink);
+      }
+
+      .source-link span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .footer {
+        margin-top: 24px;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      @media (max-width: 1100px) {
+        .hero-grid,
+        .quote-box,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .source-grid,
+        .plans,
+        .timeline {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 18px 14px 40px;
+        }
+
+        .hero,
+        .section {
+          padding: 20px;
+          border-radius: 14px;
+        }
+
+        .hero-meta,
+        .source-grid,
+        .strategy-grid,
+        .plans,
+        .timeline,
+        .source-list {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head {
+          display: block;
+        }
+
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .page {
+          max-width: none;
+          padding: 0;
+        }
+
+        .toc {
+          display: none;
+        }
+
+        .hero,
+        .section {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+
+        a {
+          color: #1d4ed8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">商业化售价路线 · 2026 版</span>
+            <h1>全科医生系统 2.0 不同版本售价规划</h1>
+            <p>
+              这份方案面向中小诊所、综合门诊、中医馆和小型连锁诊所，把当前系统能力拆成可销售版本，并给出
+              SaaS 年费、独立部署、增值服务、折扣规则和 12 个月价格路线。
+            </p>
+            <div class="hero-meta">
+              <div class="metric">
+                <strong>3,990 元/年</strong>
+                <span>建议主推标准版，价格足够易成交，也能覆盖服务成本。</span>
+              </div>
+              <div class="metric">
+                <strong>6,990 元/年</strong>
+                <span>专业版适合药房库存、统计分析、多人协作较重的诊所。</span>
+              </div>
+              <div class="metric">
+                <strong>39,800 元起</strong>
+                <span>独立部署建议从这个价格开始，避免定制和维护被低估。</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="hero-side">
+            <div>
+              <div class="recommend-title">首年推荐打法</div>
+              <div class="recommend-price">
+                标准版 <small>主推</small><br />
+                ¥3,990 <small>/ 年 / 诊所</small>
+              </div>
+              <p>
+                对多数单体诊所，先卖“挂号、接诊、处方、收费、退费、药房库存、统计报表、账号权限”完整闭环。
+              </p>
+            </div>
+            <div class="chips">
+              <span class="chip">14 天试用</span>
+              <span class="chip">年付优先</span>
+              <span class="chip">首批案例价</span>
+              <span class="chip">增值项另计</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <nav class="toc" aria-label="页面目录">
+        <a href="#market">市场锚点</a>
+        <a href="#position">定价定位</a>
+        <a href="#plans">SaaS 版本</a>
+        <a href="#deployment">独立部署</a>
+        <a href="#addons">增值服务</a>
+        <a href="#roadmap">价格路线</a>
+        <a href="#sales">成交策略</a>
+        <a href="#sources">数据来源</a>
+      </nav>
+
+      <section id="market" class="section">
+        <div class="section-head">
+          <div>
+            <h2>一、市场价格锚点</h2>
+            <p class="section-lead">
+              当前系统不是大型医院 HIS，也不是完整医保/监管平台，更适合切入“中小诊所经营管理系统”。
+              价格应低于海外成熟 EHR 平台，高于免费/低价工具，靠本地化服务、上线辅导和诊所流程贴合度提高成交率。
+            </p>
+          </div>
+          <span class="tag teal">参考价</span>
+        </div>
+
+        <div class="source-grid">
+          <div class="source-card">
+            <h3>国内低价 SaaS</h3>
+            <div class="price">约 ¥1,800/年起</div>
+            <p>第三方报告提到丁香云管家基础使用费约 1,800 元/年，医保对接另计。</p>
+          </div>
+          <div class="source-card">
+            <h3>Medycn</h3>
+            <div class="price">$50-$200/月</div>
+            <p>海外诊所管理软件按 Starter、Professional、Enterprise 设阶梯价。</p>
+          </div>
+          <div class="source-card">
+            <h3>Tebra</h3>
+            <div class="price">$49-$799/月</div>
+            <p>面向独立诊所，按 provider / month 计费，完整平台包价格更高。</p>
+          </div>
+          <div class="source-card">
+            <h3>WIO Clinic</h3>
+            <div class="price">$499/月起</div>
+            <p>按 clinic / month 做起步锚点，包含多模块和较完整的运营能力。</p>
+          </div>
+          <div class="source-card">
+            <h3>Doxer</h3>
+            <div class="price">$27.5-$118/月</div>
+            <p>轻量医疗实践软件，价格低，适合作为海外低价产品参照。</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          汇率按 2026 年 5 月 19 日 1 美元约 6.8375 元人民币估算。因此 $50/月约等于
+          ¥342/月，$499/月约等于 ¥3,412/月。国内诊所客户对价格敏感，本系统建议主价带放在
+          ¥1,990-¥6,990/年，先用年费 SaaS 起量，再用独立部署和增值项提高客单价。
+        </div>
+      </section>
+
+      <section id="position" class="section">
+        <div class="section-head">
+          <div>
+            <h2>二、产品定价定位</h2>
+            <p class="section-lead">
+              版本设计不建议按“功能越拆越碎”销售，而应按诊所经营阶段分层：能上线、能管账、能管药、能扩张。
+            </p>
+          </div>
+          <span class="tag blue">定位</span>
+        </div>
+
+        <div class="strategy-grid">
+          <div class="mini-card">
+            <h3>低价入口</h3>
+            <p>
+              用基础版承接单医生、小诊所和试水客户，避免一开始就把客户挡在门外。它不是利润主力，而是获客入口。
+            </p>
+          </div>
+          <div class="mini-card">
+            <h3>主推成交</h3>
+            <p>
+              标准版覆盖诊所日常闭环，应作为默认报价。销售话术是“把每天最频繁的挂号、接诊、开方、收费和药房管理跑顺”。
+            </p>
+          </div>
+          <div class="mini-card">
+            <h3>利润上探</h3>
+            <p>
+              专业版、连锁版和独立部署负责拉高客单价。不要用低价承诺复杂部署，否则后续服务会吃掉利润。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="plans" class="section">
+        <div class="section-head">
+          <div>
+            <h2>三、SaaS 版本售价</h2>
+            <p class="section-lead">
+              建议统一按“诊所 / 年”报价，月付只作为降低首付压力的支付方式。正式合同优先年付，避免频繁催费和服务成本失控。
+            </p>
+          </div>
+          <span class="tag green">主产品</span>
+        </div>
+
+        <div class="plans">
+          <article class="plan">
+            <div class="plan-name">
+              <h3>基础版</h3>
+            </div>
+            <div class="plan-price">¥199 <small>/月</small></div>
+            <div class="annual">¥1,990 / 年</div>
+            <p class="fit">适合 1-2 名医生、业务量较小、刚开始从纸质记录转到系统的单体诊所。</p>
+            <ul>
+              <li>1 个诊所，最多 3 个账号</li>
+              <li>患者挂号、待接诊、基础病历</li>
+              <li>西药/中成药处方、中药处方</li>
+              <li>基础收费、退费记录</li>
+              <li>药品资料和简单库存查询</li>
+              <li>科室、人员、角色基础维护</li>
+              <li>系统名称、Logo、打印参数维护</li>
+              <li>在线支持，工作日响应</li>
+            </ul>
+            <div class="plan-footer">定位：低价入口。限制用户数和高级统计，避免挤压标准版。</div>
+          </article>
+
+          <article class="plan featured">
+            <div class="plan-name">
+              <h3>标准版</h3>
+              <span class="badge">推荐</span>
+            </div>
+            <div class="plan-price">¥399 <small>/月</small></div>
+            <div class="annual">¥3,990 / 年</div>
+            <p class="fit">适合 2-5 名医生、需要完整门诊闭环和收费药房协同的多数中小诊所。</p>
+            <ul>
+              <li>1 个诊所，最多 8 个账号</li>
+              <li>完整挂号、接诊、病历、处方闭环</li>
+              <li>检查项目、治疗项目、附加费开单</li>
+              <li>收费、退费、收费记录核对</li>
+              <li>药品入库、出库、库存、零售售药</li>
+              <li>处方模板、历史处方复用</li>
+              <li>首页概览、药品、项目、财务基础统计</li>
+              <li>角色菜单权限、帮助文档、关于信息</li>
+            </ul>
+            <div class="plan-footer">定位：主力成交版本。首年重点用它做案例和续费基盘。</div>
+          </article>
+
+          <article class="plan">
+            <div class="plan-name">
+              <h3>专业版</h3>
+            </div>
+            <div class="plan-price">¥699 <small>/月</small></div>
+            <div class="annual">¥6,990 / 年</div>
+            <p class="fit">适合药房库存复杂、多人协作、老板关注经营数据和规范化管理的诊所。</p>
+            <ul>
+              <li>1 个诊所，最多 20 个账号</li>
+              <li>包含标准版全部能力</li>
+              <li>更完整的库存预警和药品经营分析</li>
+              <li>医生工作量、项目收入、财务趋势分析</li>
+              <li>更细的岗位权限和操作规范配置</li>
+              <li>上线资料整理和一次远程培训</li>
+              <li>数据导入模板支持</li>
+              <li>优先响应，关键问题当日处理</li>
+            </ul>
+            <div class="plan-footer">定位：利润版本。卖给已经重视管理效率和库存准确性的客户。</div>
+          </article>
+
+          <article class="plan">
+            <div class="plan-name">
+              <h3>连锁经营版</h3>
+            </div>
+            <div class="plan-price">¥999 <small>/月起</small></div>
+            <div class="annual">¥9,990 / 年起</div>
+            <p class="fit">适合 2 家以上门店、需要统一初始化资料、分店独立经营和总部管理口径的诊所集团。</p>
+            <ul>
+              <li>首诊所含 20 个账号</li>
+              <li>新增分店 ¥3,990-¥5,990 / 年</li>
+              <li>统一诊所初始化资料</li>
+              <li>分店独立系统名称、Logo、人员和参数</li>
+              <li>角色、菜单、基础资料复制与维护</li>
+              <li>跨诊所经营数据汇总规划</li>
+              <li>专属上线辅导和季度复盘</li>
+              <li>合同价格按门店数量阶梯折扣</li>
+            </ul>
+            <div class="plan-footer">定位：成长版本。当前应谨慎承诺总部看板深度，以阶段性交付为准。</div>
+          </article>
+        </div>
+
+        <div class="callout warning">
+          建议页面和报价单默认展示“年付价”，月付价仅用于沟通。标准版 3,990 元/年是最均衡的主推价：
+          比国内低价工具更高，给服务留空间；比海外成熟产品低很多，客户心理负担可控。
+        </div>
+      </section>
+
+      <section id="deployment" class="section">
+        <div class="section-head">
+          <div>
+            <h2>四、独立部署与私有化售价</h2>
+            <p class="section-lead">
+              独立部署不能按 SaaS 年费简单放大。它包含环境部署、数据迁移、升级兼容、远程排障和客户定制预期，必须单独计价。
+            </p>
+          </div>
+          <span class="tag amber">高客单</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>方案</th>
+              <th>建议售价</th>
+              <th>适用客户</th>
+              <th>包含内容</th>
+              <th>维护费</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>单诊所独立部署</td>
+              <td class="price-strong">¥39,800 起</td>
+              <td>不愿使用云 SaaS、有本地服务器或内网要求的单体诊所</td>
+              <td>基础部署、初始化配置、1 次远程培训、标准数据导入模板</td>
+              <td>次年起 ¥6,000/年或合同额 15%</td>
+            </tr>
+            <tr>
+              <td>小型连锁独立部署</td>
+              <td class="price-strong">¥68,000-¥128,000 起</td>
+              <td>2-10 家门店、希望统一部署和统一运维的小型集团</td>
+              <td>多诊所配置、管理员培训、基础资料初始化、远程上线陪跑</td>
+              <td>次年起合同额 15%-20%</td>
+            </tr>
+            <tr>
+              <td>深度定制交付</td>
+              <td class="price-strong">¥188,000 起</td>
+              <td>有专属流程、第三方接口、报表定制或源码交付诉求的客户</td>
+              <td>需求调研、定制开发、测试验收、专属部署、项目制交付</td>
+              <td>单独签订运维合同</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout danger">
+          独立部署不要低于 3 万元成交。低价独立部署会把“软件销售”变成“长期免费运维”，后续每一次环境、打印、数据库、网络和升级问题都会吞掉利润。
+        </div>
+      </section>
+
+      <section id="addons" class="section">
+        <div class="section-head">
+          <div>
+            <h2>五、增值服务与单独收费项</h2>
+            <p class="section-lead">
+              主版本负责标准化成交，增值项负责覆盖真实服务成本。销售时应把“软件年费”和“实施服务/接口服务”分开列，不要打包成模糊总价。
+            </p>
+          </div>
+          <span class="tag teal">增值项</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>项目</th>
+              <th>建议价格</th>
+              <th>收费逻辑</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>数据迁移</td>
+              <td class="price-strong">¥1,500-¥8,000/次</td>
+              <td>按患者、药品、历史处方、库存和原系统导出质量评估</td>
+              <td>简单 Excel 导入可优惠，非结构化数据另算</td>
+            </tr>
+            <tr>
+              <td>远程上线辅导</td>
+              <td class="price-strong">¥1,000-¥3,000/次</td>
+              <td>适合需要手把手配置科室、人员、药品和收费项目的客户</td>
+              <td>专业版可包含 1 次基础辅导</td>
+            </tr>
+            <tr>
+              <td>现场培训</td>
+              <td class="price-strong">¥2,000/人天起</td>
+              <td>按城市、天数、参训人员和差旅单独报价</td>
+              <td>建议只给年费 6,990 元以上客户销售</td>
+            </tr>
+            <tr>
+              <td>短信通知</td>
+              <td class="price-strong">¥0.08-¥0.12/条</td>
+              <td>按实际发送量计费，支持充值包</td>
+              <td>挂号提醒、复诊提醒、收费提醒可作为后续功能包</td>
+            </tr>
+            <tr>
+              <td>微信公众号/小程序</td>
+              <td class="price-strong">¥6,000-¥15,000 首年</td>
+              <td>用于预约、通知、患者自助查询等患者触达场景</td>
+              <td>次年维护 ¥1,000-¥3,000/年</td>
+            </tr>
+            <tr>
+              <td>医保接口/监管接口</td>
+              <td class="price-strong">¥15,800 起首年</td>
+              <td>按地区政策、接口厂商、联调和验收成本报价</td>
+              <td>未完成前只作为规划项，不能提前承诺交付时间</td>
+            </tr>
+            <tr>
+              <td>AI 辅助能力</td>
+              <td class="price-strong">¥199-¥499/月/诊所</td>
+              <td>适合病历草稿、处方说明、知识检索和运营分析辅助</td>
+              <td>按模型成本、调用量和风险控制单独设计</td>
+            </tr>
+            <tr>
+              <td>定制报表/打印模板</td>
+              <td class="price-strong">¥1,000-¥5,000/项</td>
+              <td>按复杂度和是否影响后续升级报价</td>
+              <td>常用模板可沉淀为标准功能</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="roadmap" class="section">
+        <div class="section-head">
+          <div>
+            <h2>六、12 个月售价路线</h2>
+            <p class="section-lead">
+              价格不要一步到顶。第一阶段用案例验证价值，第二阶段收紧折扣，第三阶段把专业版和增值服务做成利润来源。
+            </p>
+          </div>
+          <span class="tag blue">路线</span>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <strong>0-3 个月：种子客户</strong>
+            <p>
+              标准版按 ¥2,980-¥3,990/年成交，换取真实使用反馈、案例截图、推荐语和可复用初始化数据。
+            </p>
+          </div>
+          <div class="timeline-item">
+            <strong>3-6 个月：标准化成交</strong>
+            <p>
+              标准版恢复 ¥3,990/年，专业版 ¥6,990/年。形成固定报价单、实施清单、培训材料和续费流程。
+            </p>
+          </div>
+          <div class="timeline-item">
+            <strong>6-12 个月：利润上探</strong>
+            <p>
+              推专业版、连锁经营版、数据迁移、培训和定制打印模板。独立部署最低从 ¥39,800 起谈。
+            </p>
+          </div>
+          <div class="timeline-item">
+            <strong>12 个月后：行业包</strong>
+            <p>
+              根据客户结构拆出中医馆版、综合门诊版、药房加强版、连锁版，按行业场景而不是单个功能卖。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="sales" class="section">
+        <div class="section-head">
+          <div>
+            <h2>七、成交策略与折扣规则</h2>
+            <p class="section-lead">
+              诊所客户更关心“能不能马上用、能不能少出错、有没有人教”。成交时少讲技术架构，多讲流程节省和经营核对。
+            </p>
+          </div>
+          <span class="tag amber">销售</span>
+        </div>
+
+        <div class="two-col">
+          <div class="mini-card">
+            <h3>推荐报价话术</h3>
+            <ul>
+              <li>“基础版适合先跑起来，标准版是完整日常经营闭环。”</li>
+              <li>“标准版一天节省 20-30 分钟，一个月就能抵掉系统费用。”</li>
+              <li>“专业版适合药品多、库存复杂、老板想看经营数据的诊所。”</li>
+              <li>“独立部署不是软件拷贝，而是部署、上线、培训、维护的一整套交付。”</li>
+            </ul>
+          </div>
+
+          <div class="mini-card">
+            <h3>折扣边界</h3>
+            <ul>
+              <li>年付：可给 8.5-9 折，优先换取提前回款。</li>
+              <li>两年付：可给 8 折，但第二年服务范围写清楚。</li>
+              <li>首批案例：最多给到 ¥2,980/年，必须换取反馈和案例。</li>
+              <li>独立部署：不建议打折，最多赠送培训或模板配置。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="quote-box" style="margin-top: 18px">
+          <div class="quote-main">
+            <h3>建议首年销售目标</h3>
+            <p>优先拿下 20 家标准版客户，验证续费、实施和支持成本。</p>
+            <div class="number">20 × ¥3,990 = ¥79,800</div>
+            <p>
+              如果其中 20% 升级专业版或购买数据迁移、培训、打印模板，首年收入会更稳，且能沉淀真实客户需求。
+            </p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>客户类型</th>
+                <th>推荐版本</th>
+                <th>首报价</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>单医生小诊所</td>
+                <td>基础版或标准版</td>
+                <td class="price-strong">¥1,990-¥3,990/年</td>
+              </tr>
+              <tr>
+                <td>2-5 名医生综合诊所</td>
+                <td>标准版</td>
+                <td class="price-strong">¥3,990/年</td>
+              </tr>
+              <tr>
+                <td>药品和库存较重诊所</td>
+                <td>专业版</td>
+                <td class="price-strong">¥6,990/年</td>
+              </tr>
+              <tr>
+                <td>多门店客户</td>
+                <td>连锁经营版</td>
+                <td class="price-strong">¥9,990/年起</td>
+              </tr>
+              <tr>
+                <td>要求内网或私有部署</td>
+                <td>独立部署</td>
+                <td class="price-strong">¥39,800 起</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>八、最终推荐</h2>
+            <p class="section-lead">
+              最适合当前阶段的打法：标准版跑量，专业版赚钱，独立部署抬高品牌和客单价，增值服务覆盖人工成本。
+            </p>
+          </div>
+          <span class="tag green">结论</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>优先级</th>
+              <th>动作</th>
+              <th>原因</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>P0</td>
+              <td>把标准版 ¥3,990/年作为默认报价</td>
+              <td>覆盖当前系统核心闭环，价格对中小诊所可接受，也能承担基础服务成本。</td>
+            </tr>
+            <tr>
+              <td>P0</td>
+              <td>推出 14 天试用和首批案例价</td>
+              <td>降低初次成交阻力，用真实客户反馈修正功能和销售材料。</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>把专业版做成库存与经营分析加强版</td>
+              <td>愿意为库存准确、财务核对和经营统计付费的客户，价格承受力更高。</td>
+            </tr>
+            <tr>
+              <td>P1</td>
+              <td>独立部署从 ¥39,800 起</td>
+              <td>私有部署本质是项目交付，必须覆盖部署、培训、升级和运维成本。</td>
+            </tr>
+            <tr>
+              <td>P2</td>
+              <td>逐步开发医保、小程序、AI、短信等增值项</td>
+              <td>这些能力不是所有客户都需要，但能显著提高重点客户客单价。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sources" class="section">
+        <div class="section-head">
+          <div>
+            <h2>数据来源与说明</h2>
+            <p class="section-lead">
+              以下来源用于建立市场价格锚点。不同产品功能、国家地区、服务范围差异较大，本方案最终价格按当前系统能力和国内中小诊所付费习惯做了折中。
+            </p>
+          </div>
+          <span class="tag blue">Sources</span>
+        </div>
+
+        <div class="source-list">
+          <a class="source-link" href="https://qccdata.qichacha.com/ReportData/PDF/1c5070708dd37b276f4a72c788eb0424.pdf" target="_blank" rel="noreferrer">
+            <strong>国内基层医疗报告</strong>
+            <span>提到丁香云管家基础年费和医保接口收费，可作为国内低价和接口收费参考。</span>
+          </a>
+          <a class="source-link" href="https://prime.medycn.com/pricing/" target="_blank" rel="noreferrer">
+            <strong>Medycn Prime Pricing</strong>
+            <span>公开列出 Starter、Professional、Enterprise 的月费和年费。</span>
+          </a>
+          <a class="source-link" href="https://www.tebra.com/pricing/overview" target="_blank" rel="noreferrer">
+            <strong>Tebra Pricing Overview</strong>
+            <span>公开说明按 provider / month 的订阅价格区间。</span>
+          </a>
+          <a class="source-link" href="https://wioclinic.com/en/pricing" target="_blank" rel="noreferrer">
+            <strong>WIO Clinic Pricing</strong>
+            <span>以 clinic / month 为锚点，展示更完整诊所管理平台的国际价位。</span>
+          </a>
+          <a class="source-link" href="https://www.doxer.io/en/pricing/" target="_blank" rel="noreferrer">
+            <strong>Doxer Pricing</strong>
+            <span>轻量医疗实践软件价格，用于低价海外产品参照。</span>
+          </a>
+          <a class="source-link" href="https://www.ce.cn/xwzx/gnsz/gdxw/202605/t20260519_2976148.shtml" target="_blank" rel="noreferrer">
+            <strong>人民币汇率中间价</strong>
+            <span>2026 年 5 月 19 日美元兑人民币中间价，用于美元价格折算。</span>
+          </a>
+        </div>
+
+        <div class="callout">
+          本页适合用于内部定价讨论、销售报价准备和版本路线确认。正式对外报价时，建议删除市场来源区，只保留客户关心的版本、价格、包含服务和实施周期。
+        </div>
+      </section>
+
+      <div class="footer">
+        全科医生系统 2.0 售价路线规划 · 生成日期：2026-05-20 · 建议每季度复盘一次实际成交价、服务成本和续费率
+      </div>
+    </main>
+  </body>
+</html>

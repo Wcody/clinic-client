@@ -45,6 +45,10 @@ import {
 import { getRoleListApi } from "@/api/system/role";
 import { hasAuth } from "@/router/utils";
 import { nextTick } from "process";
+import {
+  applyTenantInitDataGuard,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 const pwdProgress = [
   { color: "#e74242", text: "非常弱" },
@@ -218,7 +222,7 @@ export function useUser(tableRef: Ref, treeRef: Ref) {
     background: true
   });
 
-  const columns: TableColumnList = [
+  const columns: TableColumnList = withTenantInitDataColumn([
     {
       label: "勾选列", // 如果需要表格多选，此处label必须设置
       type: "selection",
@@ -321,7 +325,7 @@ export function useUser(tableRef: Ref, treeRef: Ref) {
       width: 180,
       slot: "operation"
     }
-  ];
+  ]);
   const buttonClass = computed(() => {
     return [
       "!h-[20px]",
@@ -531,6 +535,7 @@ export function useUser(tableRef: Ref, treeRef: Ref) {
             console.log("curData", curData);
             delete curData.higherDeptOptions;
             delete curData.title;
+            applyTenantInitDataGuard(curData);
             // 表单规则校验通过
             if (title === "新增") {
               await addUserApi(curData);

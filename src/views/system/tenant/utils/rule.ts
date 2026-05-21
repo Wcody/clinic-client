@@ -6,6 +6,12 @@ import { isPhone, isEmail } from "@pureadmin/utils";
 export const formRules = reactive(<FormRules>{
   account: [{ required: true, message: "登录账号为必填项", trigger: "blur" }],
   password: [{ required: true, message: "登录密码为必填项", trigger: "blur" }],
+  adminAccount: [
+    { required: true, message: "初始管理员账号为必填项", trigger: "blur" }
+  ],
+  adminPassword: [
+    { required: true, message: "初始管理员密码为必填项", trigger: "blur" }
+  ],
   name: [{ required: true, message: "用户姓名为必填项", trigger: "blur" }],
   nickname: [{ required: true, message: "用户昵称为必填项", trigger: "blur" }],
   phone: [
@@ -24,6 +30,34 @@ export const formRules = reactive(<FormRules>{
     }
   ],
   email: [
+    {
+      validator: (rule, value, callback) => {
+        if (value === "") {
+          callback();
+        } else if (!isEmail(value)) {
+          callback(new Error("请输入正确的邮箱格式"));
+        } else {
+          callback();
+        }
+      },
+      trigger: "blur"
+    }
+  ],
+  adminPhone: [
+    {
+      validator: (rule, value, callback) => {
+        if (value === "") {
+          callback();
+        } else if (!isPhone(value)) {
+          callback(new Error("请输入正确的手机号码格式"));
+        } else {
+          callback();
+        }
+      },
+      trigger: "blur"
+    }
+  ],
+  adminEmail: [
     {
       validator: (rule, value, callback) => {
         if (value === "") {

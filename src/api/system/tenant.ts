@@ -25,6 +25,16 @@ export type BQTenantEntityType = {
   deviceCode: string;
   expireDate: Date;
   remark: string;
+  adminAccount?: string;
+  adminPassword?: string;
+  adminName?: string;
+  adminPhone?: string;
+  adminEmail?: string;
+  menuIds?: string[];
+  menuOptions?: Recordable[];
+  currentUserCount?: number;
+  adminCount?: number;
+  menuCount?: number;
   lastUpdatedTime: Date;
 } & BQBaseEntityType;
 
@@ -49,6 +59,16 @@ export const getTenantEntityDefault: (
     deviceCode: row?.deviceCode ?? "",
     expireDate: row?.expireDate ?? undefined,
     lastUpdatedTime: row?.lastUpdatedTime ?? undefined,
+    adminAccount: row?.adminAccount ?? "",
+    adminPassword: row?.adminPassword ?? "",
+    adminName: row?.adminName ?? "",
+    adminPhone: row?.adminPhone ?? "",
+    adminEmail: row?.adminEmail ?? "",
+    menuIds: row?.menuIds ?? [],
+    menuOptions: row?.menuOptions ?? [],
+    currentUserCount: row?.currentUserCount ?? 0,
+    adminCount: row?.adminCount ?? 0,
+    menuCount: row?.menuCount ?? 0,
     ...getBaseEntityDefault(row)
   };
 };
@@ -88,6 +108,13 @@ export type BQTenantSearchListResultType = BQResultType<
  */
 export const getTenantInfoApi = () => {
   return http.request<BQTenantInfoResultType>("get", "/tenant/getInfo");
+};
+
+/**
+ * 获取当前登录诊所授权信息
+ */
+export const getTenantAuthInfoApi = () => {
+  return http.request<BQTenantEntityResultType>("get", "/tenant/getAuthInfo");
 };
 
 /**

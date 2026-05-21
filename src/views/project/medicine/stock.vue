@@ -151,17 +151,17 @@ const detailPagination = reactive({
 const handleViewStockDetail = (row: any) => {
   currentDrug.value = row;
   detailList.value = [
-    {
-      id: "1",
-      inboundNo: "1901041044143502",
-      inboundTime: "2019-01-04 10:44:03",
-      quantity: "3盒2粒",
-      purchasePrice: "0.0元",
-      inboundType: "其他入库",
-      operator: "曾俊华",
-      batchNo: "",
-      batchStock: "0盒0粒"
-    }
+    // {
+    //   id: "1",
+    //   inboundNo: "1901041044143502",
+    //   inboundTime: "2019-01-04 10:44:03",
+    //   quantity: "3盒2粒",
+    //   purchasePrice: "0.0元",
+    //   inboundType: "其他入库",
+    //   operator: "曾俊华",
+    //   batchNo: "",
+    //   batchStock: "0盒0粒"
+    // }
   ];
   detailPagination.total = 1;
   showDetail.value = true;
@@ -193,8 +193,8 @@ const checkQueryForm = reactive({
 });
 
 const checkerOptions = [
-  { label: "全部", value: "" },
-  { label: "曾俊华", value: "曾俊华" }
+  { label: "全部", value: "" }
+  // { label: "曾俊华", value: "曾俊华" }
 ];
 
 const checkColumns: TableColumnList = [
@@ -207,14 +207,14 @@ const checkColumns: TableColumnList = [
 ];
 
 const checkList = ref<any[]>([
-  {
-    id: "1",
-    serialNo: "001",
-    orderNo: "2604121804306969",
-    checkType: "1",
-    checkTime: "2026-04-12",
-    checker: "曾俊华"
-  }
+  // {
+  //   id: "1",
+  //   serialNo: "001",
+  //   orderNo: "2604121804306969",
+  //   checkType: "1",
+  //   checkTime: "2026-04-12",
+  //   checker: "曾俊华"
+  // }
 ]);
 
 const checkPagination = reactive({
@@ -256,7 +256,7 @@ const showNewCheck = ref(false);
 
 const newCheckForm = reactive({
   checkDate: "2026-04-12",
-  checker: "曾俊华",
+  checker: "",
   items: [
     {
       id: "d1",

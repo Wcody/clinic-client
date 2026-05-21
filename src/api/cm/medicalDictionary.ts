@@ -15,6 +15,8 @@ export interface BQMedicalDictionaryEntityType {
   name: string; // 字典名称/值
   seq?: number; // 排序
   common?: boolean; // 是否常用
+  tenantId?: string; // 租户ID
+  tenantInitData?: boolean; // 租户初始化数据
   medicineType?: boolean; // 药品类型 true西药 false中药
   executionProject?: boolean; // 是否执行项目
   day?: number; // 天数（频率专用）

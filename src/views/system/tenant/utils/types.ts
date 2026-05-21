@@ -3,21 +3,19 @@ import type { BQTenantEntityType } from "@/api/system/tenant";
 interface FormItemProps extends BQTenantEntityType {
   title: string;
   higherGroupOptions: Record<string, unknown>[];
+  menuOptions: Record<string, unknown>[];
+  menuIds: string[];
 }
-interface FormProps {
-  formInline: FormItemProps;
-}
-
 interface FormProps {
   formInline: FormItemProps;
 }
 
 interface UserFormItemProps {
   name: string;
-  /** 用户列表 */
-  userOptions: any[];
-  /** 选中的角色列表 */
-  ids: Record<string, unknown>[];
+  /** 管理员候选用户列表 */
+  roleOptions: any[];
+  /** 选中的管理员用户ID */
+  ids: string[];
 }
 interface UserFormProps {
   formInline: UserFormItemProps;

@@ -29,6 +29,7 @@ export type BQDrugEntityType = {
   pinyin?: string;
   status?: boolean;
   source?: string; // 来源（前端扩展字段）
+  category?: string;
   wholesaleUnit?: string;
   wholesalePrice?: string;
   conversionValue?: string;
@@ -45,6 +46,7 @@ export type BQDrugEntityType = {
   defaultSaleType?: number; // 0整卖 1散卖
   decoWay?: string;
   id?: number;
+  tenantInitData?: boolean;
 } & BQBaseEntityType;
 
 /**
@@ -69,6 +71,7 @@ export const getDrugEntityDefault: (
     expireDate: row?.expireDate ?? "",
     status: row?.status ?? true,
     source: row?.source ?? "",
+    tenantInitData: row?.tenantInitData ?? true,
     category: row?.category ?? "",
     ...getBaseEntityDefault(row)
   };

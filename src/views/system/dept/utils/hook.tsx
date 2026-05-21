@@ -17,6 +17,10 @@ import {
 import { BQSearchFilter, BQSearchOrder } from "@/api/api";
 import { hasAuth } from "@/router/utils";
 import { ElMessageBox } from "element-plus";
+import {
+  applyTenantInitDataGuard,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 export function useDept() {
   const form = reactive({
@@ -37,7 +41,7 @@ export function useDept() {
     total: 0
   });
 
-  const columns: TableColumnList = [
+  const columns: TableColumnList = withTenantInitDataColumn([
     {
       label: "科室名称",
       prop: "name",
@@ -97,7 +101,7 @@ export function useDept() {
       width: 210,
       slot: "operation"
     }
-  ];
+  ]);
 
   function onChange({ row, index }) {
     ElMessageBox.confirm(
@@ -244,6 +248,7 @@ export function useDept() {
         FormRef.validate(async valid => {
           if (valid) {
             console.log("curData", curData);
+            applyTenantInitDataGuard(curData);
             // 表单规则校验通过
             if (title === "新增") {
               await addDeptApi(curData);

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { getAuthInfoApi } from "@/api/system/user";
+import { getTenantAuthInfoApi } from "@/api/system/tenant";
 import { useSystemAuthinfo } from "@/views/auth/systemAuthInfo";
+import { useTenantInfoStoreHook } from "@/store/modules/tenantInfo";
+import { isPlatformTenant } from "@/utils/tenantInitData";
 import { ref } from "vue";
 
 defineOptions({
@@ -9,12 +12,21 @@ defineOptions({
 
 const systemInfoRef = ref([]);
 const authInfoRef = ref([]);
+const tenantInfoStore = useTenantInfoStoreHook();
 
-getAuthInfoApi().then(res => {
-  const { systemInfo, authInfo } = useSystemAuthinfo(res);
+Promise.all([
+  tenantInfoStore.loadTenantInfo(),
+  isPlatformTenant() ? getAuthInfoApi() : getTenantAuthInfoApi()
+]).then(([, res]) => {
+  const { systemInfo, authInfo, isPlatform } = useSystemAuthinfo(res);
   systemInfoRef.value = systemInfo;
   authInfoRef.value = authInfo;
+  pageTitle.value = isPlatform ? "平台信息" : "诊所信息";
+  authTitle.value = isPlatform ? "平台授权" : "诊所授权";
 });
+
+const pageTitle = ref("系统信息");
+const authTitle = ref("授权信息");
 </script>
 
 <template>
@@ -31,7 +43,7 @@ getAuthInfoApi().then(res => {
     <el-card class="m-4 box-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="font-bold">系统信息</span>
+          <span class="font-bold">{{ pageTitle }}</span>
         </div>
       </template>
       <PureDescriptions border :columns="systemInfoRef" :column="2" />
@@ -40,7 +52,7 @@ getAuthInfoApi().then(res => {
     <el-card class="m-4 box-card" shadow="never">
       <template #header>
         <div class="card-header flex items-center">
-          <span class="font-bold">授权信息</span>
+          <span class="font-bold">{{ authTitle }}</span>
           <el-tag type="primary" effect="dark" size="small" round class="ml-1">
             {{ authInfoRef.length }}
           </el-tag>

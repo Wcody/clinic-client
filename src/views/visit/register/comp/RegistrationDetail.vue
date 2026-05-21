@@ -58,7 +58,9 @@ const patientForm = reactive({
   address: "",
   firstAge: 0,
   lastAge: 0,
-  ageType: 1
+  ageType: 1,
+  height: null as number | null,
+  weight: null as number | null
 });
 
 // 保存完整的患者信息（包含时间戳等元数据）
@@ -82,6 +84,8 @@ const initForm = () => {
   patientForm.firstAge = 0;
   patientForm.lastAge = 0;
   patientForm.ageType = 1;
+  patientForm.height = null;
+  patientForm.weight = null;
   snapshot = { ...patientForm };
 };
 
@@ -200,6 +204,12 @@ const handleCancelEdit = () => {
   editing.value = false;
 };
 
+const normalizeOptionalNumber = (value: unknown) => {
+  if (value === "" || value == null) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
 const handleSave = async () => {
   saveLoading.value = true;
   try {
@@ -217,7 +227,9 @@ const handleSave = async () => {
       address: patientForm.address || undefined,
       firstAge: patientForm.firstAge,
       lastAge: patientForm.lastAge,
-      ageType: patientForm.ageType
+      ageType: patientForm.ageType,
+      height: normalizeOptionalNumber(patientForm.height),
+      weight: normalizeOptionalNumber(patientForm.weight)
     } as any);
     ElMessage.success("患者信息保存成功");
     snapshot = { ...patientForm };
@@ -285,7 +297,9 @@ const loadData = async () => {
         address: patient.address || "",
         firstAge: patient.firstAge || 0,
         lastAge: patient.lastAge || 0,
-        ageType: patient.ageType || 1
+        ageType: patient.ageType || 1,
+        height: patient.height != null ? Number(patient.height) : null,
+        weight: patient.weight != null ? Number(patient.weight) : null
       });
 
       // 如果有省份，加载城市列表
@@ -398,6 +412,34 @@ onMounted(async () => {
                 :disabled="!editing"
                 class="rd-input"
               />
+            </el-form-item>
+          </div>
+
+          <!-- 身高 / 体重 -->
+          <div class="rd-row">
+            <el-form-item label="身高">
+              <el-input
+                v-model.number="patientForm.height"
+                :disabled="!editing"
+                type="number"
+                min="0"
+                step="0.01"
+                class="rd-input"
+              >
+                <template #append>cm</template>
+              </el-input>
+            </el-form-item>
+            <el-form-item label="体重">
+              <el-input
+                v-model.number="patientForm.weight"
+                :disabled="!editing"
+                type="number"
+                min="0"
+                step="0.01"
+                class="rd-input"
+              >
+                <template #append>kg</template>
+              </el-input>
             </el-form-item>
           </div>
 
@@ -539,6 +581,30 @@ onMounted(async () => {
               <el-radio value="初诊">初诊</el-radio>
               <el-radio value="复诊">复诊</el-radio>
             </el-radio-group>
+          </el-form-item>
+
+          <el-form-item label="身高">
+            <el-input
+              :value="
+                registrationDetail?.height != null
+                  ? `${registrationDetail.height} cm`
+                  : '-'
+              "
+              disabled
+              class="rd-reg-input"
+            />
+          </el-form-item>
+
+          <el-form-item label="体重">
+            <el-input
+              :value="
+                registrationDetail?.weight != null
+                  ? `${registrationDetail.weight} kg`
+                  : '-'
+              "
+              disabled
+              class="rd-reg-input"
+            />
           </el-form-item>
 
           <el-form-item label="挂号时间">

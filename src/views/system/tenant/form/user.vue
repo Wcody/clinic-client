@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import ReCol from "@/components/ReCol";
 import { UserFormProps } from "../utils/types";
 
@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<UserFormProps>(), {
 });
 
 const newFormInline = ref(props.formInline);
+
+const selectedCount = computed(() => newFormInline.value.ids?.length ?? 0);
 </script>
 
 <template>
@@ -30,20 +32,27 @@ const newFormInline = ref(props.formInline);
         <el-form-item label="管理员列表" prop="ids">
           <el-select
             v-model="newFormInline.ids"
-            placeholder="请选择"
+            placeholder="搜索并选择管理员"
             class="w-full"
             clearable
+            filterable
             multiple
           >
             <el-option
               v-for="(item, index) in newFormInline.roleOptions"
               :key="index"
               :value="item.eid"
-              :label="item.name"
+              :label="`${item.name || item.account}（${item.account}）`"
             >
-              {{ item.name }}
+              <span>{{ item.name || item.account }}</span>
+              <span class="ml-2 text-[var(--el-text-color-secondary)]">
+                {{ item.account }}
+              </span>
             </el-option>
           </el-select>
+          <div class="mt-2 text-sm text-[var(--el-text-color-secondary)]">
+            已绑定 {{ selectedCount }} 名管理员，解绑后该用户将不再作为本诊所管理员进入平台。
+          </div>
         </el-form-item>
       </re-col>
     </el-row>

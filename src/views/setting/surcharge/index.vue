@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import type { FormInstance, FormRules } from "element-plus";
 import AddFill from "@iconify-icons/ri/add-circle-line";
@@ -14,6 +14,11 @@ import {
   type BQSurchargeFeeEntityType,
   getSurchargeFeeEntityDefault
 } from "@/api/system/setting";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({ name: "SettingSurcharge" });
 
@@ -24,6 +29,7 @@ const dialogTitle = ref("添加附加费用");
 const loading = ref(false);
 const nameInputRef = ref<HTMLInputElement>();
 const formRef = ref<FormInstance>();
+const isPlatformTenant = useIsPlatformTenant();
 
 // 表单验证规则
 const formRules = reactive<FormRules>({
@@ -75,6 +81,12 @@ const columns = ref<any>([
   { label: "成本价", prop: "costPrice", minWidth: 150, slot: "costPrice" },
   { label: "操作", fixed: "right", width: 150, slot: "operation" }
 ]);
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value
+    ? withTenantInitDataColumn(columns.value)
+    : columns.value;
+});
 
 const dataList = ref<BQSurchargeFeeEntityType[]>([]);
 
@@ -138,7 +150,7 @@ const handleSave = async () => {
     if (!valid) return;
 
     const api = feeForm.id ? updateSurchargeFeeApi : addSurchargeFeeApi;
-    const res = await api(feeForm);
+    const res = await api(applyTenantInitDataGuard({ ...feeForm }));
     if (res.code === 0) {
       ElMessage.success(
         dialogTitle.value === "添加附加费用" ? "添加成功" : "编辑成功"
@@ -163,7 +175,7 @@ const handleToggleStatus = async (row: BQSurchargeFeeEntityType) => {
       type: "warning"
     });
 
-    const updatedRow = { ...row, status: !row.status };
+    const updatedRow = applyTenantInitDataGuard({ ...row, status: !row.status });
     const res = await updateSurchargeFeeApi(updatedRow);
     if (res.code === 0) {
       row.status = !row.status;
@@ -181,7 +193,9 @@ const handleToggleStatus = async (row: BQSurchargeFeeEntityType) => {
 
 const handleToggleDefault = async (row: BQSurchargeFeeEntityType) => {
   try {
-    const res = await updateSurchargeFeeApi(row);
+    const res = await updateSurchargeFeeApi(
+      applyTenantInitDataGuard({ ...row })
+    );
     if (res.code !== 0) {
       ElMessage.error(res.errMsg || res.message || "更新失败");
       row.defaultAdd = !row.defaultAdd; // 恢复原状态
@@ -208,7 +222,7 @@ onMounted(() => {
         class="w-full"
         style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
         title="附加费管理"
-        :columns="columns"
+        :columns="tableColumns"
         @refresh="handleQuery"
       >
         <template #buttons>
@@ -325,6 +339,16 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="默认添加到处方">
           <el-switch v-model="feeForm.defaultAdd" />
+        </el-form-item>
+        <el-form-item v-if="isPlatformTenant" label="租户初始化数据">
+          <el-switch
+            v-model="feeForm.tenantInitData"
+            inline-prompt
+            :active-value="true"
+            :inactive-value="false"
+            active-text="是"
+            inactive-text="否"
+          />
         </el-form-item>
       </el-form>
       <template #footer>

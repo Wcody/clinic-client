@@ -57,6 +57,8 @@ const {
   menuTreeData,
   treeLoading,
   selectedNum,
+  checkedMenuCount,
+  halfCheckedMenuCount,
   pagination,
   buttonClass,
   treeSearchValue,
@@ -67,6 +69,7 @@ const {
   onSearch,
   resetForm,
   onbatchDel,
+  handleBatchStatus,
   openDialog,
   handleMenu,
   downloadAuth,
@@ -78,6 +81,7 @@ const {
   onSelectionCancel,
   handleCurrentChange,
   handleSelectionChange,
+  updateMenuCheckCount,
   onQueryChanged,
   filterMethod,
   transformI18n
@@ -201,7 +205,33 @@ onMounted(() => {
                   取消选择
                 </el-button>
               </div>
-              <el-popconfirm title="是否确认删除?" @confirm="onbatchDel">
+              <el-popconfirm
+                :width="320"
+                :title="`确认启用已选 ${selectedNum} 个诊所？`"
+                @confirm="handleBatchStatus(true)"
+              >
+                <template #reference>
+                  <el-button v-auth="'tenant:setStatus'" type="primary" text>
+                    批量启用
+                  </el-button>
+                </template>
+              </el-popconfirm>
+              <el-popconfirm
+                :width="340"
+                :title="`确认停用已选 ${selectedNum} 个诊所？停用后相关诊所用户将无法正常访问业务。`"
+                @confirm="handleBatchStatus(false)"
+              >
+                <template #reference>
+                  <el-button v-auth="'tenant:setStatus'" type="warning" text>
+                    批量停用
+                  </el-button>
+                </template>
+              </el-popconfirm>
+              <el-popconfirm
+                :width="340"
+                :title="`确认删除已选 ${selectedNum} 个诊所？存在管理员、用户或业务数据的诊所会被系统拒绝删除。`"
+                @confirm="onbatchDel"
+              >
                 <template #reference>
                   <el-button
                     v-auth="'tenant:delete'"
@@ -249,7 +279,8 @@ onMounted(() => {
                   修改
                 </el-button>
                 <el-popconfirm
-                  :title="`是否确认删除诊所名称为${row.name}的这条数据`"
+                  :width="340"
+                  :title="`确认删除诊所「${row.name}」？存在管理员、用户或业务数据时系统会拒绝删除。`"
                   @confirm="handleDelete(row)"
                 >
                   <template #reference>
@@ -369,6 +400,12 @@ onMounted(() => {
             <el-checkbox v-model="isSelectAll" label="全选/全不选" />
             <el-checkbox v-model="isLinkage" label="父子联动" />
           </div>
+          <div
+            class="mb-2 text-sm text-[var(--el-text-color-secondary)] flex gap-3"
+          >
+            <span>已选 {{ checkedMenuCount }} 项</span>
+            <span>半选 {{ halfCheckedMenuCount }} 项</span>
+          </div>
           <el-tree-v2
             ref="menuTreeRef"
             show-checkbox
@@ -377,6 +414,7 @@ onMounted(() => {
             :height="treeHeight"
             :check-strictly="!isLinkage"
             :filter-method="filterMethod"
+            @check="updateMenuCheckCount"
           >
             <template #default="{ node }">
               <span style="padding-right: 10px">{{

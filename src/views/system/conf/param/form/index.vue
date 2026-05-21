@@ -23,6 +23,9 @@ const ruleFormRef = ref();
 const newFormInline = ref(props.formInline);
 
 const fileListRef = ref([]);
+const previewImage = computed(
+  () => newFormInline.value.paramValue?.fileList?.[0]
+);
 
 const handleRemove: UploadProps["onRemove"] = (uploadFile, uploadFiles) => {
   fileListRef.value.length = 0;
@@ -62,13 +65,15 @@ defineExpose({ getRef, getFileList });
             placeholder="请输入参数值"
           />
           <img
-            v-else-if="newFormInline.paramType === 3"
+            v-else-if="newFormInline.paramType === 3 && previewImage"
             class="w-[300px]"
-            :src="
-              'ams/mvc/v1/download/images/' +
-              newFormInline.paramValue?.fileList[0]
-            "
+            :src="'ams/mvc/v1/download/images/' + previewImage"
             alt="图片预览"
+          />
+          <el-empty
+            v-else-if="newFormInline.paramType === 3"
+            description="未设置"
+            :image-size="80"
           />
           <el-input
             v-else

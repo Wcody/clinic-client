@@ -12,22 +12,26 @@ import AccountSettingsIcon from "@iconify-icons/ri/user-settings-line";
 import LogoutCircleRLineIcon from "@iconify-icons/ri/logout-circle-r-line";
 import ResetPassIcon from "@iconify-icons/ri/lock-password-line";
 import AbountIcon from "@iconify-icons/ri/information-line";
+import HelpIcon from "@iconify-icons/ri/question-line";
 import SettingIcon from "@iconify-icons/ri/settings-3-line";
 import CheckIcon from "@iconify-icons/ep/check";
-import { onMounted, ref } from "vue";
-import { getTenantInfoApi } from "@/api/system/tenant";
+import { onMounted } from "vue";
+import { useTenantInfoStoreHook } from "@/store/modules/tenantInfo";
 
 const {
   layout,
   device,
   setAccountInfo,
   changePassword,
+  helpSystem,
   aboutSystem,
   logout,
   onPanel,
   pureApp,
   account,
   userAvatar,
+  tenantLogo,
+  tenantName,
   avatarsStyle,
   toggleSideBar,
   getDropdownItemStyle,
@@ -35,17 +39,10 @@ const {
 } = useNav();
 
 const { t, locale, translationCh, translationEn } = useTranslationLang();
+const tenantInfoStore = useTenantInfoStoreHook();
 
-const tenantLogo = ref("");
-const tenantName = ref("");
-
-onMounted(async () => {
-  const res = await getTenantInfoApi();
-  console.log("res", res);
-  if (res.code === 0) {
-    tenantLogo.value = "/ams/mvc/v1/download/images" + res.data.tenantLogo;
-    tenantName.value = res.data.tenantName;
-  }
+onMounted(() => {
+  tenantInfoStore.loadTenantInfo();
 });
 </script>
 
@@ -128,6 +125,10 @@ onMounted(async () => {
             <el-dropdown-item @click="changePassword">
               <IconifyIconOffline :icon="ResetPassIcon" style="margin: 5px" />
               修改密码
+            </el-dropdown-item>
+            <el-dropdown-item @click="helpSystem">
+              <IconifyIconOffline :icon="HelpIcon" style="margin: 5px" />
+              帮助说明
             </el-dropdown-item>
             <el-dropdown-item @click="aboutSystem">
               <IconifyIconOffline :icon="AbountIcon" style="margin: 5px" />

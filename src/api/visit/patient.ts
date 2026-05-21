@@ -49,6 +49,8 @@ export type BQVisitPatientEntityType = {
   firstAge: number; // 首次就诊年龄
   lastAge: number; // 最近就诊年龄
   ageType: number; // 年龄类型：1-岁，2-月，3-天
+  height: number | null; // 身高，单位cm
+  weight: number | null; // 体重，单位kg
   isAllergy: boolean; // 是否过敏
   allergicHistory: string; // 过敏史
   pastHistory: string; // 既往史

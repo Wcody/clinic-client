@@ -53,6 +53,8 @@ export type BQRegistrationEntityType = {
   status: string; // 待接诊 / 已接诊 / 已完成 / 已取消
   statusFee: string; // 未缴费 / 已缴费
   age: string; // 年龄字符串：3年2月
+  height?: number | null; // 挂号时患者身高，单位cm
+  weight?: number | null; // 挂号时患者体重，单位kg
   createTime: string;
   updateTime: string;
 };
@@ -76,6 +78,9 @@ export type BQRegistrationDto = {
   registrationType?: number;
   outpatientType?: string; // 门诊类型（普通门诊/专家门诊/急诊等）
   isFirstVisit?: boolean;
+  age?: string;
+  height?: number | null;
+  weight?: number | null;
 };
 
 /**

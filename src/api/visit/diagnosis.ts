@@ -30,6 +30,7 @@ export type BQDiagnosisDictEntityType = {
   updatedBy: string; // 更新人（继承自基类）
   updatedTime: string; // 更新时间（继承自基类）
   tenantId: string; // 租户ID（继承自基类）
+  tenantInitData: boolean; // 租户初始化数据
 };
 
 // ==================== 返回类型 ====================

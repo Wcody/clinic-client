@@ -26,7 +26,7 @@ export function useGroup(initKind) {
   });
 
   const getTitle = () => {
-    return initKind == 0 ? "诊所组" : "客户组";
+    return initKind == 0 ? "诊所管理组" : "客户管理组";
   };
 
   const formRef = ref();

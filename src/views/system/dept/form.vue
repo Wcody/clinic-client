@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watchEffect } from "vue";
 import ReCol from "@/components/ReCol";
 import { formRules } from "./utils/rule";
 import { FormProps } from "./utils/types";
 import { usePublicHooks } from "../../hooks";
 import { getDeptEntityDefault } from "@/api/system/dept";
+import { useIsPlatformTenant } from "@/utils/tenantInitData";
 
 const props = withDefaults(defineProps<FormProps>(), {
   formInline: () => ({
@@ -17,6 +18,13 @@ const props = withDefaults(defineProps<FormProps>(), {
 const ruleFormRef = ref();
 const { switchStyle } = usePublicHooks();
 const newFormInline = ref(props.formInline);
+const isPlatformTenant = useIsPlatformTenant();
+
+watchEffect(() => {
+  if (!isPlatformTenant.value) {
+    newFormInline.value.tenantInitData = false;
+  }
+});
 
 function getRef() {
   return ruleFormRef.value;
@@ -121,6 +129,19 @@ defineExpose({ getRef });
             :inactive-value="false"
             active-text="启用"
             inactive-text="停用"
+            :style="switchStyle"
+          />
+        </el-form-item>
+      </re-col>
+      <re-col v-if="isPlatformTenant" :value="12" :xs="24" :sm="24">
+        <el-form-item label="租户初始化数据">
+          <el-switch
+            v-model="newFormInline.tenantInitData"
+            inline-prompt
+            :active-value="true"
+            :inactive-value="false"
+            active-text="是"
+            inactive-text="否"
             :style="switchStyle"
           />
         </el-form-item>

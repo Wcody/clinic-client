@@ -19,6 +19,8 @@ export type BQAnyResultType = BQResultType<any>;
 export type BQBaseEntityType = {
   version: number;
   eid: string;
+  tenantId?: string;
+  tenantInitData?: boolean;
   createdTime: string;
   updatedTime: string;
   createdBy: string;
@@ -41,6 +43,8 @@ export const getBaseEntityDefault: (
   return {
     version: row?.version ?? 0,
     eid: row?.eid,
+    tenantId: row?.tenantId,
+    tenantInitData: row?.tenantInitData ?? true,
     createdTime: undefined,
     updatedTime: undefined,
     createdBy: undefined,

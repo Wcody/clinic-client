@@ -217,16 +217,19 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
 
   async function handleDelete(row) {
     await deleteCustomerApi(row.eid);
-    message(`您删除了客户编号为${row.id}的这条数据`, { type: "success" });
+    message(`已删除客户「${row.name}」`, { type: "success" });
     onSearch();
   }
 
   function handleSizeChange(val: number) {
-    console.log(`${val} items per page`);
+    pagination.pageSize = val;
+    pagination.currentPage = 1;
+    onSearch();
   }
 
   function handleCurrentChange(val: number) {
-    console.log(`current page: ${val}`);
+    pagination.currentPage = val;
+    onSearch();
   }
 
   /** 当CheckBox选择项发生变化时会触发该事件 */
@@ -249,7 +252,7 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     const curSelected = tableRef.value.getTableRef().getSelectionRows();
     const data = getKeyList(curSelected, "eid");
     await deleteBatchCustomerApi(data);
-    message(`已删除客户编号为 ${data} 的数据`, {
+    message(`已删除 ${data.length} 个客户`, {
       type: "success"
     });
     onSearch();
@@ -266,7 +269,7 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     if (params?.phone) {
       ret.push(new BQSearchFilter("phone", "like", params.phone));
     }
-    if (params?.status) {
+    if (params?.status === true || params?.status === false) {
       ret.push(new BQSearchFilter("status", "eq", params.status));
     }
     return ret;
@@ -303,6 +306,7 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     formEl.resetFields();
     form.parentId = "";
     form.parentName = "全部";
+    pagination.currentPage = 1;
     treeRef.value.onTreeReset();
     onSearch();
   };
@@ -310,6 +314,7 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
   function onTreeSelect({ eid, name, selected }) {
     form.parentId = selected ? eid : "";
     form.parentName = selected ? name : "全部";
+    pagination.currentPage = 1;
     onSearch();
   }
 
@@ -416,7 +421,7 @@ export function useCustomer(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     const { eid, name } = curRow.value;
     // 根据客户 id 调用实际项目中菜单权限修改接口
     await saveMenuIdsByApi(eid, menuTreeRef.value.getCheckedKeys());
-    message(`角色名称为${name}的菜单权限修改成功`, {
+    message(`客户「${name}」的可用菜单已保存`, {
       type: "success"
     });
   }

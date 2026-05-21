@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useSystemAuthinfo } from "./systemAuthInfo";
 import { getAuthInfoApi } from "@/api/system/user";
+import { useTenantInfoStoreHook } from "@/store/modules/tenantInfo";
 
 defineOptions({
   name: "SysAuthorization"
@@ -9,12 +10,18 @@ defineOptions({
 
 const systemInfoRef = ref([]);
 const authInfoRef = ref([]);
+const tenantInfoStore = useTenantInfoStoreHook();
 
-getAuthInfoApi().then(res => {
-  const { systemInfo, authInfo } = useSystemAuthinfo(res);
+Promise.all([tenantInfoStore.loadTenantInfo(), getAuthInfoApi()]).then(([, res]) => {
+  const { systemInfo, authInfo, isPlatform } = useSystemAuthinfo(res);
   systemInfoRef.value = systemInfo;
   authInfoRef.value = authInfo;
+  pageTitle.value = isPlatform ? "平台信息" : "诊所信息";
+  authTitle.value = isPlatform ? "平台授权" : "诊所授权";
 });
+
+const pageTitle = ref("系统信息");
+const authTitle = ref("授权信息");
 
 function goBack() {
   window.location.href = "/";
@@ -26,7 +33,7 @@ function goBack() {
     <el-card class="m-4 box-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="font-bold">系统信息</span>
+          <span class="font-bold">{{ pageTitle }}</span>
         </div>
       </template>
       <PureDescriptions border :columns="systemInfoRef" :column="2" />
@@ -35,7 +42,7 @@ function goBack() {
     <el-card class="m-4 box-card" shadow="never">
       <template #header>
         <div class="card-header flex items-center">
-          <span class="font-bold">授权信息</span>
+          <span class="font-bold">{{ authTitle }}</span>
           <el-tag type="primary" effect="dark" size="small" round class="ml-1">
             {{ authInfoRef.length }}
           </el-tag>

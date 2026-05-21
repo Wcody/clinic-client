@@ -10,6 +10,7 @@ import {
 import { loginApi, refreshTokenApi } from "@/api/system/user";
 import { useMultiTagsStoreHook } from "./multiTags";
 import { type DataInfo, setToken, removeToken, userKey } from "@/utils/auth";
+import { useTenantInfoStoreHook } from "./tenantInfo";
 
 export const useUserStore = defineStore({
   id: "pure-user",
@@ -31,7 +32,8 @@ export const useUserStore = defineStore({
     // 登录页的免登录存储几天，默认7天
     loginDay: 7,
     tenantLogo: storageLocal().getItem<DataInfo<number>>(userKey)?.tenantLogo,
-    tenantName: storageLocal().getItem<DataInfo<number>>(userKey)?.tenantName
+    tenantName: storageLocal().getItem<DataInfo<number>>(userKey)?.tenantName,
+    tenantId: storageLocal().getItem<DataInfo<number>>(userKey)?.tenantId ?? ""
   }),
   actions: {
     /** 存储头像 */
@@ -49,6 +51,18 @@ export const useUserStore = defineStore({
     /** 存储角色 */
     SET_ROLES(roles: Array<string>) {
       this.roles = roles;
+    },
+    /** 存储当前租户ID */
+    SET_TENANT_ID(tenantId: string) {
+      this.tenantId = tenantId;
+    },
+    /** 存储当前诊所名称 */
+    SET_TENANT_NAME(tenantName: string) {
+      this.tenantName = tenantName;
+    },
+    /** 存储当前诊所Logo */
+    SET_TENANT_LOGO(tenantLogo: string) {
+      this.tenantLogo = tenantLogo;
     },
     /** 存储是否勾选了登录页的免登录 */
     SET_ISREMEMBERED(bool: boolean) {
@@ -70,6 +84,8 @@ export const useUserStore = defineStore({
     logOut() {
       this.account = "";
       this.roles = [];
+      this.tenantId = "";
+      useTenantInfoStoreHook().resetTenantInfo();
       removeToken();
       useMultiTagsStoreHook().handleTags("equal", [...routerArrays]);
       resetRouter();

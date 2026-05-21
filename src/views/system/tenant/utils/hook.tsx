@@ -4,7 +4,7 @@ import { handleTree } from "@/utils/tree";
 import { message } from "@/utils/message";
 import { usePublicHooks } from "../../../hooks";
 import { transformI18n } from "@/plugins/i18n";
-import { addDialog } from "@/components/ReDialog";
+import { addDialog, dialogStore } from "@/components/ReDialog";
 import type { PaginationProps } from "@pureadmin/table";
 import type { FormItemProps, UserFormItemProps } from "../utils/types";
 import { getKeyList, deviceDetection } from "@pureadmin/utils";
@@ -37,8 +37,12 @@ import { getUserListApi } from "@/api/system/user";
 import { hasAuth } from "@/router/utils";
 import { getRoleMenusApi } from "@/api/system/menu";
 import { getMenuIdsByApi, saveMenuIdsByApi } from "@/api/system/tenant";
-import { url } from "inspector";
 import { saveBlobToFile } from "@/utils/common";
+import { authTypeLables } from "@/utils/dataconst";
+import { platformTenantId } from "@/utils/tenantInitData";
+
+const TENANT_FORM_DIALOG_CLASS = "tenant-form-dialog";
+const TENANT_FORM_DIALOG_TITLES = ["新增诊所", "修改诊所"];
 
 export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
   const form = reactive({
@@ -70,6 +74,8 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
   const menuTreeData = ref([]);
   const treeLoading = ref(true);
   const selectedNum = ref(0);
+  const checkedMenuCount = ref(0);
+  const halfCheckedMenuCount = ref(0);
   const pagination = reactive<PaginationProps>({
     total: 0,
     pageSize: 10,
@@ -89,12 +95,50 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
       minWidth: 130
     },
     {
-      label: "失效日期",
+      label: "授权类型",
+      prop: "authType",
+      minWidth: 100,
+      cellRenderer: ({ row, props }) => (
+        <el-tag size={props.size} effect="plain">
+          {authTypeLables[row.authType] ?? "临时授权"}
+        </el-tag>
+      )
+    },
+    {
+      label: "截止日期",
       prop: "expireDate",
-      minWidth: 130,
-      formatter: (row: BQTenantEntityType) => {
-        return row.expireDate ? dayjs(row.expireDate).format("YYYY-MM-DD") : "";
+      minWidth: 150,
+      cellRenderer: scope => {
+        const expireInfo = getExpireInfo(scope.row.expireDate);
+        return (
+          <el-tag size={scope.props.size} type={expireInfo.type} effect="plain">
+            {expireInfo.label}
+          </el-tag>
+        );
       }
+    },
+    {
+      label: "最大用户数",
+      prop: "maxUserCount",
+      minWidth: 100
+    },
+    {
+      label: "当前用户数",
+      prop: "currentUserCount",
+      minWidth: 100,
+      formatter: (row: BQTenantEntityType) => String(row.currentUserCount ?? 0)
+    },
+    {
+      label: "管理员数",
+      prop: "adminCount",
+      minWidth: 90,
+      formatter: (row: BQTenantEntityType) => String(row.adminCount ?? 0)
+    },
+    {
+      label: "菜单授权",
+      prop: "menuCount",
+      minWidth: 90,
+      formatter: (row: BQTenantEntityType) => String(row.menuCount ?? 0)
     },
     {
       label: "负责人",
@@ -102,7 +146,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
       minWidth: 130
     },
     {
-      label: "租组",
+      label: "诊所管理组",
       prop: "parentName",
       minWidth: 90
     },
@@ -166,15 +210,48 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
   });
 
   const userOptions = ref([]);
+  const openingTenantFormDialog = ref(false);
+
+  function removeTenantFormDialogs() {
+    dialogStore.value = dialogStore.value.filter(dialog => {
+      const title = dialog.title ?? "";
+      return (
+        dialog.class !== TENANT_FORM_DIALOG_CLASS &&
+        !TENANT_FORM_DIALOG_TITLES.includes(title)
+      );
+    });
+  }
+
+  function getExpireInfo(expireDate?: Date): {
+    label: string;
+    type: "success" | "warning" | "danger" | "info";
+  } {
+    if (!expireDate) {
+      return { label: "未设置", type: "info" };
+    }
+    const expireDay = dayjs(expireDate).startOf("day");
+    const days = expireDay.diff(dayjs().startOf("day"), "day");
+    if (days < 0) {
+      return {
+        label: `已过期 ${expireDay.format("YYYY-MM-DD")}`,
+        type: "danger"
+      };
+    }
+    if (days <= 30) {
+      return {
+        label: `${expireDay.format("YYYY-MM-DD")} 剩${days}天`,
+        type: "warning"
+      };
+    }
+    return { label: expireDay.format("YYYY-MM-DD"), type: "success" };
+  }
 
   function onChange({ row, index }) {
     console.log(row, index);
     ElMessageBox.confirm(
-      `确认要<strong>${
-        row.status ? "启用" : "禁用"
-      }</strong><strong style='color:var(--el-color-primary)'>${
+      `确认要<strong>${row.status ? "启用" : "禁用"}</strong><strong style='color:var(--el-color-primary)'>${
         row.name
-      }</strong>吗?`,
+      }</strong>吗?${row.status ? "" : " 停用后该诊所用户将无法正常访问业务。"}`,
       "系统提示",
       {
         confirmButtonText: "确定",
@@ -218,16 +295,19 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
 
   async function handleDelete(row) {
     await deleteTenantApi(row.eid);
-    message(`您删除了诊所编号为${row.id}的这条数据`, { type: "success" });
+    message(`已删除诊所「${row.name}」`, { type: "success" });
     onSearch();
   }
 
   function handleSizeChange(val: number) {
-    console.log(`${val} items per page`);
+    pagination.pageSize = val;
+    pagination.currentPage = 1;
+    onSearch();
   }
 
   function handleCurrentChange(val: number) {
-    console.log(`current page: ${val}`);
+    pagination.currentPage = val;
+    onSearch();
   }
 
   /** 当CheckBox选择项发生变化时会触发该事件 */
@@ -250,7 +330,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     const curSelected = tableRef.value.getTableRef().getSelectionRows();
     const data = getKeyList(curSelected, "eid");
     await deleteBatchTenantApi(data);
-    message(`已删除诊所编号为 ${data} 的数据`, {
+    message(`已删除 ${data.length} 个诊所`, {
       type: "success"
     });
     onSearch();
@@ -267,7 +347,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     if (params?.phone) {
       ret.push(new BQSearchFilter("phone", "like", params.phone));
     }
-    if (params?.status) {
+    if (params?.status === true || params?.status === false) {
       ret.push(new BQSearchFilter("status", "eq", params.status));
     }
     return ret;
@@ -304,6 +384,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     formEl.resetFields();
     form.parentId = "";
     form.parentName = "全部";
+    pagination.currentPage = 1;
     treeRef.value.onTreeReset();
     onSearch();
   };
@@ -311,6 +392,18 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
   function onTreeSelect({ eid, name, selected }) {
     form.parentId = selected ? eid : "";
     form.parentName = selected ? name : "全部";
+    pagination.currentPage = 1;
+    onSearch();
+  }
+
+  async function handleBatchStatus(status: boolean) {
+    const curSelected = tableRef.value.getTableRef().getSelectionRows();
+    const ids = getKeyList(curSelected, "eid");
+    await Promise.all(ids.map(id => setStatusTenantApi(id, status)));
+    message(`已${status ? "启用" : "停用"} ${ids.length} 个诊所`, {
+      type: "success"
+    });
+    onSelectionCancel();
     onSearch();
   }
 
@@ -325,16 +418,34 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     return newTreeList;
   }
 
-  function openDialog(title = "新增", row?: FormItemProps) {
+  async function openDialog(title = "新增", row?: FormItemProps) {
+    if (openingTenantFormDialog.value) {
+      return;
+    }
+    openingTenantFormDialog.value = true;
+    removeTenantFormDialogs();
+    const dialogTitle = `${title}诊所`;
+    let defaultMenuIds = [];
+    try {
+      defaultMenuIds = row?.eid
+        ? (await getMenuIdsByApi(row.eid)).data || []
+        : (await getMenuIdsByApi(platformTenantId)).data || [];
+    } catch (error) {
+      openingTenantFormDialog.value = false;
+      throw error;
+    }
     addDialog({
-      title: `${title}诊所`,
+      title: dialogTitle,
+      class: TENANT_FORM_DIALOG_CLASS,
       props: {
         formInline: {
           title,
           higherGroupOptions: formatHigherGroupOptions(
             higherGroupOptions.value
           ),
-          ...getTenantEntityDefault(row)
+          ...getTenantEntityDefault(row),
+          menuOptions: menuTreeData.value,
+          menuIds: defaultMenuIds
         }
       },
       alignCenter: true,
@@ -342,7 +453,11 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
       draggable: true,
       fullscreen: deviceDetection(),
       fullscreenIcon: true,
+      destroyOnClose: true,
       closeOnClickModal: false,
+      closeCallBack: () => {
+        openingTenantFormDialog.value = false;
+      },
       contentRenderer: () => h(editForm, { ref: formRef }),
       beforeSure: (done, { options }) => {
         const FormRef = formRef.value.getRef();
@@ -357,14 +472,25 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
         FormRef.validate(async valid => {
           if (valid) {
             console.log("curData", curData);
+            const menuIds = [...(curData.menuIds || [])];
             delete curData.higherGroupOptions;
+            delete curData.menuOptions;
+            delete curData.menuIds;
             delete curData.title;
+            delete curData.currentUserCount;
+            delete curData.adminCount;
+            delete curData.menuCount;
             // 表单规则校验通过
             if (title === "新增") {
-              await addTenantApi(curData);
+              const { data } = await addTenantApi(curData);
+              const tenantId = data?.eid || curData.eid;
+              if (tenantId) {
+                await saveMenuIdsByApi(tenantId, menuIds);
+              }
               chores();
             } else {
               await updateTenantApi(curData);
+              await saveMenuIdsByApi(curData.eid, menuIds);
               chores();
             }
           }
@@ -396,9 +522,12 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
       isShow.value = true;
       const { data } = await getMenuIdsByApi(eid);
       menuTreeRef.value.setCheckedKeys(data || []);
+      updateMenuCheckCount();
     } else {
       curRow.value = null;
       isShow.value = false;
+      checkedMenuCount.value = 0;
+      halfCheckedMenuCount.value = 0;
     }
   }
 
@@ -415,9 +544,20 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     const { eid, name } = curRow.value;
     // 根据诊所 id 调用实际项目中菜单权限修改接口
     await saveMenuIdsByApi(eid, menuTreeRef.value.getCheckedKeys());
-    message(`角色名称为${name}的菜单权限修改成功`, {
+    message(`诊所「${name}」的可用菜单已保存`, {
       type: "success"
     });
+  }
+
+  function updateMenuCheckCount() {
+    const tree = menuTreeRef.value;
+    if (!tree) {
+      checkedMenuCount.value = 0;
+      halfCheckedMenuCount.value = 0;
+      return;
+    }
+    checkedMenuCount.value = tree.getCheckedKeys()?.length ?? 0;
+    halfCheckedMenuCount.value = tree.getHalfCheckedKeys?.()?.length ?? 0;
   }
 
   const onQueryChanged = (query: string) => {
@@ -490,6 +630,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     val
       ? menuTreeRef.value.setCheckedKeys(treeIds.value)
       : menuTreeRef.value.setCheckedKeys([]);
+    updateMenuCheckCount();
   });
 
   return {
@@ -507,6 +648,8 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     menuTreeData,
     treeLoading,
     selectedNum,
+    checkedMenuCount,
+    halfCheckedMenuCount,
     pagination,
     buttonClass,
     isExpandAll,
@@ -516,6 +659,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     onSearch,
     resetForm,
     onbatchDel,
+    handleBatchStatus,
     openDialog,
     handleMenu,
     downloadAuth,
@@ -528,6 +672,7 @@ export function useTenant(tableRef: Ref, treeRef: Ref, menuTreeRef: Ref) {
     onSelectionCancel,
     handleCurrentChange,
     handleSelectionChange,
+    updateMenuCheckCount,
     onQueryChanged,
     filterMethod,
     transformI18n

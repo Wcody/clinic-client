@@ -24,6 +24,10 @@ import {
   saveMenuIdsByApi
 } from "@/api/system/menu";
 import { hasAuth } from "@/router/utils";
+import {
+  applyTenantInitDataGuard,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 export function useRole(treeRef: Ref) {
   //搜索条件
@@ -56,7 +60,7 @@ export function useRole(treeRef: Ref) {
     currentPage: 1,
     background: true
   });
-  const columns: TableColumnList = [
+  const columns: TableColumnList = withTenantInitDataColumn([
     {
       label: "角色名称",
       prop: "name"
@@ -117,7 +121,7 @@ export function useRole(treeRef: Ref) {
       width: 210,
       slot: "operation"
     }
-  ];
+  ]);
   // const buttonClass = computed(() => {
   //   return [
   //     "!h-[20px]",
@@ -265,6 +269,7 @@ export function useRole(treeRef: Ref) {
         FormRef.validate(async valid => {
           if (valid) {
             console.log("curData", curData);
+            applyTenantInitDataGuard(curData);
             // 表单规则校验通过
             if (title === "新增") {
               await addRoleApi(curData);

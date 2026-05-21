@@ -40,7 +40,7 @@ const switchToForm = () => {
 
 // ==================== 新增入库 Tab ====================
 const inboundForm = reactive({
-  operator: "曾俊华",
+  operator: "",
   inboundType: "采购入库",
   items: [] as any[]
 });
@@ -242,105 +242,105 @@ const recordColumns: TableColumnList = [
 ];
 
 const recordList = ref([
-  {
-    id: "1",
-    serialNo: "001",
-    orderNo: "240830182044091 4",
-    inboundTime: "2024-08-30",
-    amount: "189.80元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "2",
-    serialNo: "002",
-    orderNo: "240830181858628 4",
-    inboundTime: "2024-08-30",
-    amount: "0.00元",
-    inboundType: "其他入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "3",
-    serialNo: "003",
-    orderNo: "201019183322185 4",
-    inboundTime: "2020-10-19",
-    amount: "0.00元",
-    inboundType: "其他入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "4",
-    serialNo: "004",
-    orderNo: "200827108055455 68",
-    inboundTime: "2020-08-27",
-    amount: "0.00元",
-    inboundType: "其他入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "5",
-    serialNo: "005",
-    orderNo: "200823082964553 7",
-    inboundTime: "2020-08-23",
-    amount: "0.00元",
-    inboundType: "其他入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "6",
-    serialNo: "006",
-    orderNo: "200823084282020 8",
-    inboundTime: "2020-08-23",
-    amount: "0.00元",
-    inboundType: "其他入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "7",
-    serialNo: "007",
-    orderNo: "200823807267604 9",
-    inboundTime: "2020-08-23",
-    amount: "3020.00元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "8",
-    serialNo: "008",
-    orderNo: "200104129263781 2",
-    inboundTime: "2020-01-04",
-    amount: "288.00元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "9",
-    serialNo: "009",
-    orderNo: "191204141679829",
-    inboundTime: "2019-12-04",
-    amount: "380.00元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "10",
-    serialNo: "010",
-    orderNo: "191128122190050 5",
-    inboundTime: "2019-11-28",
-    amount: "110.00元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  },
-  {
-    id: "11",
-    serialNo: "011",
-    orderNo: "191128115073015 0",
-    inboundTime: "2019-11-28",
-    amount: "80.00元",
-    inboundType: "采购入库",
-    operator: "曾俊华"
-  }
+  // {
+  //   id: "1",
+  //   serialNo: "001",
+  //   orderNo: "240830182044091 4",
+  //   inboundTime: "2024-08-30",
+  //   amount: "189.80元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "2",
+  //   serialNo: "002",
+  //   orderNo: "240830181858628 4",
+  //   inboundTime: "2024-08-30",
+  //   amount: "0.00元",
+  //   inboundType: "其他入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "3",
+  //   serialNo: "003",
+  //   orderNo: "201019183322185 4",
+  //   inboundTime: "2020-10-19",
+  //   amount: "0.00元",
+  //   inboundType: "其他入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "4",
+  //   serialNo: "004",
+  //   orderNo: "200827108055455 68",
+  //   inboundTime: "2020-08-27",
+  //   amount: "0.00元",
+  //   inboundType: "其他入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "5",
+  //   serialNo: "005",
+  //   orderNo: "200823082964553 7",
+  //   inboundTime: "2020-08-23",
+  //   amount: "0.00元",
+  //   inboundType: "其他入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "6",
+  //   serialNo: "006",
+  //   orderNo: "200823084282020 8",
+  //   inboundTime: "2020-08-23",
+  //   amount: "0.00元",
+  //   inboundType: "其他入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "7",
+  //   serialNo: "007",
+  //   orderNo: "200823807267604 9",
+  //   inboundTime: "2020-08-23",
+  //   amount: "3020.00元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "8",
+  //   serialNo: "008",
+  //   orderNo: "200104129263781 2",
+  //   inboundTime: "2020-01-04",
+  //   amount: "288.00元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "9",
+  //   serialNo: "009",
+  //   orderNo: "191204141679829",
+  //   inboundTime: "2019-12-04",
+  //   amount: "380.00元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "10",
+  //   serialNo: "010",
+  //   orderNo: "191128122190050 5",
+  //   inboundTime: "2019-11-28",
+  //   amount: "110.00元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // },
+  // {
+  //   id: "11",
+  //   serialNo: "011",
+  //   orderNo: "191128115073015 0",
+  //   inboundTime: "2019-11-28",
+  //   amount: "80.00元",
+  //   inboundType: "采购入库",
+  //   operator: "曾俊华"
+  // }
 ]);
 
 const recordPagination = reactive({

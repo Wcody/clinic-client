@@ -8,9 +8,11 @@ import { useFullscreen } from "@vueuse/core";
 import type { routeMetaType } from "../types";
 import { transformI18n } from "@/plugins/i18n";
 import { router, remainingPaths } from "@/router";
-import { computed, h, onMounted, ref, type CSSProperties } from "vue";
+import { computed, h, ref, type CSSProperties } from "vue";
+import { PRODUCT_NAME } from "@/utils/product";
 import { useAppStoreHook } from "@/store/modules/app";
 import { useUserStoreHook } from "@/store/modules/user";
+import { useTenantInfoStoreHook } from "@/store/modules/tenantInfo";
 import { useGlobal, isAllEmpty, deviceDetection } from "@pureadmin/utils";
 import { useEpThemeStoreHook } from "@/store/modules/epTheme";
 import { usePermissionStoreHook } from "@/store/modules/permission";
@@ -22,6 +24,7 @@ import type { FormItemProps } from "@/views/system/user/utils/types";
 import { message } from "@/utils/message";
 import editForm from "@/views/system/user/form/index.vue";
 import aboutForm from "@/views/about/index.vue";
+import helpForm from "@/views/help/index.vue";
 import { handleChangePassword } from "@/views/system/user/utils/hook";
 import TenantLogo from "/images/default.webp";
 
@@ -33,6 +36,7 @@ export function useNav() {
   const routers = useRouter().options.routes;
   const { isFullscreen, toggle } = useFullscreen();
   const { wholeMenus } = storeToRefs(usePermissionStoreHook());
+  const tenantInfoStore = useTenantInfoStoreHook();
   /** 平台`layout`中所有`el-tooltip`的`effect`配置，默认`light` */
   const tooltipEffect = getConfig()?.TooltipEffect ?? "light";
 
@@ -55,16 +59,16 @@ export function useNav() {
 
   /** 诊所logo */
   const tenantLogo = computed(() => {
-    return isAllEmpty(useUserStoreHook()?.tenantLogo)
+    return isAllEmpty(tenantInfoStore.systemLogo)
       ? TenantLogo
-      : useUserStoreHook()?.tenantLogo;
+      : tenantInfoStore.systemLogo;
   });
 
-  /** 诊所名称 */
+  /** 系统名称 */
   const tenantName = computed(() => {
-    return isAllEmpty(useUserStoreHook()?.tenantName)
-      ? "九维无纸化病案系统"
-      : useUserStoreHook()?.tenantName;
+    return isAllEmpty(tenantInfoStore.systemName)
+      ? getConfig("Title")
+      : tenantInfoStore.systemName;
   });
 
   /** 昵称（如果昵称为空则显示用户名） */
@@ -107,13 +111,11 @@ export function useNav() {
     return $storage?.layout?.layout;
   });
 
-  const title = computed(() => {
-    return $config.Title;
-  });
+  const title = computed(() => PRODUCT_NAME);
 
   /** 动态title */
   function changeTitle(meta: routeMetaType) {
-    const Title = getConfig().Title;
+    const Title = PRODUCT_NAME || getConfig().Title;
     if (Title) document.title = `${transformI18n(meta.title)} | ${Title}`;
     else document.title = transformI18n(meta.title);
   }
@@ -171,6 +173,23 @@ export function useNav() {
   /** 修改密码 */
   async function changePassword() {
     handleChangePassword(useUserStoreHook().getUserInfo().eid);
+  }
+
+  /** 帮助说明 */
+  async function helpSystem() {
+    addDialog({
+      title: `帮助说明`,
+      alignCenter: true,
+      lockScroll: false,
+      draggable: true,
+      fullscreen: deviceDetection(),
+      fullscreenIcon: true,
+      closeOnClickModal: true,
+      showClose: true,
+      destroyOnClose: true,
+      footerRenderer: () => h("span"),
+      contentRenderer: () => h(helpForm)
+    });
   }
 
   /** 关于系统 */
@@ -241,7 +260,9 @@ export function useNav() {
 
   /** 获取`logo` */
   function getLogo() {
-    return new URL("/quanke.logo256.png", import.meta.url).href;
+    return (
+      tenantLogo.value || new URL("/quanke.logo256.png", import.meta.url).href
+    );
   }
 
   return {
@@ -250,6 +271,7 @@ export function useNav() {
     layout,
     setAccountInfo,
     changePassword,
+    helpSystem,
     aboutSystem,
     logout,
     routers,

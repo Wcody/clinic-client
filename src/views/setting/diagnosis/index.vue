@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { ref, reactive, computed, onMounted, nextTick } from "vue";
 import Refresh from "@iconify-icons/ep/refresh";
 import Plus from "@iconify-icons/ep/plus";
 import { PureTableBar } from "@/components/RePureTableBar";
@@ -20,6 +20,11 @@ import {
   type BQDiagnosisDictEntityType
 } from "@/api/visit/diagnosis";
 import { BQSearchFilter } from "@/api/api";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({ name: "SettingDiagnosisIndex" });
 
@@ -31,6 +36,7 @@ const loading = ref(false);
 const dialogVisible = ref(false);
 const dialogTitle = ref("新增诊断");
 const nameInputRef = ref<HTMLInputElement>();
+const isPlatformTenant = useIsPlatformTenant();
 
 const queryForm = reactive({
   keyword: "",
@@ -47,7 +53,8 @@ const defaultForm = (): Partial<BQDiagnosisDictEntityType> => ({
   diagnosisCode: "",
   diagnosisName: "",
   pinyin: "",
-  status: true
+  status: true,
+  tenantInitData: true
 });
 
 const form = reactive<Partial<BQDiagnosisDictEntityType>>(defaultForm());
@@ -72,6 +79,10 @@ const columns: TableColumnList = [
   { label: "创建时间", prop: "createdTime", minWidth: 160 },
   { label: "操作", fixed: "right", width: 200, slot: "operation" }
 ];
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value ? withTenantInitDataColumn(columns) : columns;
+});
 
 const dataList = ref<BQDiagnosisDictEntityType[]>([]);
 
@@ -153,7 +164,8 @@ const openDialog = (type: "add" | "edit", row?: BQDiagnosisDictEntityType) => {
       diagnosisName: row!.diagnosisName,
       pinyin: row!.pinyin,
       status: row!.status,
-      version: row!.version
+      version: row!.version,
+      tenantInitData: row!.tenantInitData ?? true
     });
   }
   formRef.value?.clearValidate();
@@ -170,9 +182,10 @@ const handleSave = async () => {
   loading.value = true;
   try {
     const isEdit = !!form.id;
+    const payload = applyTenantInitDataGuard({ ...form });
     const res = isEdit
-      ? await updateDiagnosisDictApi(form as BQDiagnosisDictEntityType)
-      : await saveDiagnosisDictApi(form);
+      ? await updateDiagnosisDictApi(payload as BQDiagnosisDictEntityType)
+      : await saveDiagnosisDictApi(payload);
 
     if (res.code === 0) {
       ElMessage.success(isEdit ? "编辑成功" : "新增成功");
@@ -202,10 +215,10 @@ const handleToggleStatus = async (row: BQDiagnosisDictEntityType) => {
       }
     );
 
-    const res = await updateDiagnosisDictApi({
+    const res = await updateDiagnosisDictApi(applyTenantInitDataGuard({
       ...row,
       status: !row.status
-    });
+    }));
 
     if (res.code === 0) {
       row.status = !row.status;
@@ -308,7 +321,7 @@ onMounted(() => {
         class="w-full"
         style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
         title="诊断字典"
-        :columns="columns"
+        :columns="tableColumns"
         @refresh="handleQuery"
       >
         <template #buttons>
@@ -424,6 +437,20 @@ onMounted(() => {
             v-model="form.status"
             active-text="启用"
             inactive-text="禁用"
+          />
+        </el-form-item>
+        <el-form-item
+          v-if="isPlatformTenant"
+          label="租户初始化数据"
+          label-width="120px"
+        >
+          <el-switch
+            v-model="form.tenantInitData"
+            inline-prompt
+            :active-value="true"
+            :inactive-value="false"
+            active-text="是"
+            inactive-text="否"
           />
         </el-form-item>
       </el-form>

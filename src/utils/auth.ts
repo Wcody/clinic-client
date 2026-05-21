@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import { storageLocal } from "@pureadmin/utils";
 import { useUserStoreHook } from "@/store/modules/user";
+import { useTenantInfoStoreHook } from "@/store/modules/tenantInfo";
 
 export interface DataInfo<T> {
   /** token */
@@ -33,6 +34,8 @@ export interface DataInfo<T> {
   tenantLogo?: string;
   /** 诊所名称 */
   tenantName?: string;
+  /** 当前租户ID */
+  tenantId?: string;
 }
 
 export const userKey = "user-info";
@@ -63,7 +66,7 @@ export function setToken(data: DataInfo<Date>) {
   console.log("setToken", data);
   let expires = 0;
   const { accessToken } = data;
-  const refreshToken = data.accessToken;
+  const refreshToken = data.refreshToken || data.accessToken;
   const { isRemembered, loginDay } = useUserStoreHook();
   expires = new Date(data.expires).getTime(); // 如果后端直接设置时间戳，将此处代码改为expires = data.expires，然后把上面的DataInfo<Date>改成DataInfo<number>即可
   const cookieString = JSON.stringify({ accessToken, expires, refreshToken });
@@ -94,10 +97,25 @@ export function setToken(data: DataInfo<Date>) {
     remark,
     roles
   }) {
+    const tenantId =
+      data?.tenantId ??
+      storageLocal().getItem<DataInfo<number>>(userKey)?.tenantId ??
+      "";
+    const tenantLogo =
+      data?.tenantLogo ??
+      storageLocal().getItem<DataInfo<number>>(userKey)?.tenantLogo ??
+      "";
+    const tenantName =
+      data?.tenantName ??
+      storageLocal().getItem<DataInfo<number>>(userKey)?.tenantName ??
+      "";
     useUserStoreHook().SET_AVATAR(avatar);
     useUserStoreHook().SET_ACCOUNT(account);
     useUserStoreHook().SET_NICKNAME(nickname);
     useUserStoreHook().SET_ROLES(roles);
+    useUserStoreHook().SET_TENANT_ID(tenantId);
+    useUserStoreHook().SET_TENANT_LOGO(tenantLogo);
+    useUserStoreHook().SET_TENANT_NAME(tenantName);
     storageLocal().setItem(userKey, {
       refreshToken,
       expires,
@@ -111,8 +129,9 @@ export function setToken(data: DataInfo<Date>) {
       sex,
       remark,
       roles,
-      tenantLogo: data?.tenantLogo ?? "",
-      tenantName: data?.tenantName ?? ""
+      tenantLogo,
+      tenantName,
+      tenantId
     });
   }
 
@@ -128,6 +147,7 @@ export function setToken(data: DataInfo<Date>) {
       remark: data?.remark ?? "",
       roles
     });
+    useTenantInfoStoreHook().loadTenantInfo();
   } else {
     const avatar =
       storageLocal().getItem<DataInfo<number>>(userKey)?.avatar ?? "";

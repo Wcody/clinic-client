@@ -52,7 +52,7 @@ defineExpose({ getRef });
           <el-input
             v-model="newFormInline.name"
             clearable
-            placeholder="请输入登录账号"
+            placeholder="请输入客户名称"
           />
         </el-form-item>
       </re-col>
@@ -61,7 +61,7 @@ defineExpose({ getRef });
           <el-input
             v-model="newFormInline.principal"
             clearable
-            placeholder="请输入用户姓名"
+            placeholder="请输入负责人"
           />
         </el-form-item>
       </re-col>

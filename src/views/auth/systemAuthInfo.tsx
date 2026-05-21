@@ -1,8 +1,13 @@
 import { getConfig } from "@/config";
 import { authTypeLables } from "@/utils/dataconst";
+import { isPlatformTenant } from "@/utils/tenantInitData";
+import { PRODUCT_NAME } from "@/utils/product";
+import { useUserStoreHook } from "@/store/modules/user";
 
 export function useSystemAuthinfo(info) {
   const data = info?.data || {};
+  const userStore = useUserStoreHook();
+  const platform = isPlatformTenant();
   const systemInfo = [
     {
       label: "系统名称",
@@ -10,7 +15,7 @@ export function useSystemAuthinfo(info) {
       cellRenderer: () => {
         return (
           <el-tag size="large" class="!text-base">
-            {getConfig("Title")}
+            {PRODUCT_NAME}
           </el-tag>
         );
       }
@@ -71,7 +76,7 @@ export function useSystemAuthinfo(info) {
     }
   ];
 
-  const authInfo = [
+  const platformAuthInfo = [
     {
       label: "主体名称",
       span: 2,
@@ -148,5 +153,59 @@ export function useSystemAuthinfo(info) {
     }
   ];
 
-  return { systemInfo, authInfo };
+  const tenantInfo = [
+    {
+      label: "诊所名称",
+      span: 2,
+      labelClassName: "label-fixed-width",
+      cellRenderer: () => {
+        return (
+          <el-tag size="large" class="!text-base">
+            {userStore.tenantName || "当前诊所"}
+          </el-tag>
+        );
+      }
+    },
+    {
+      label: "授权类别",
+      labelClassName: "label-fixed-width",
+      cellRenderer: () => {
+        return (
+          <el-tag size="large" class="!text-base">
+            {authTypeLables[data.authType] || "-"}
+          </el-tag>
+        );
+      }
+    },
+    {
+      label: "截止日期",
+      className: "w-[30%]",
+      labelClassName: "label-fixed-width",
+      cellRenderer: () => {
+        const expireDate = data.expireDate?.substring?.(0, 10) || "-";
+        return (
+          <el-tag size="large" type="success" class="!text-base">
+            {data.authType == 2 ? "无" : expireDate}
+          </el-tag>
+        );
+      }
+    },
+    {
+      label: "用户额度",
+      labelClassName: "label-fixed-width",
+      cellRenderer: () => {
+        return (
+          <el-tag size="large" class="!text-base">
+            {data.maxUserCount ?? "-"}
+          </el-tag>
+        );
+      }
+    }
+  ];
+
+  return {
+    systemInfo,
+    authInfo: platform ? platformAuthInfo : tenantInfo,
+    isPlatform: platform
+  };
 }

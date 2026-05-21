@@ -203,6 +203,64 @@ const getSecondUnitText = (ageType: number) => {
   return ageType === 1 ? "月" : "天";
 };
 
+const normalizeOptionalNumber = (value: unknown) => {
+  if (value === "" || value == null) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const buildAgeText = (
+  firstAge: number | null,
+  lastAge: number | null,
+  ageType: number
+) => {
+  const firstAgeVal = firstAge ?? 0;
+  const lastAgeVal = lastAge ?? 0;
+  if (ageType === 1) {
+    return lastAgeVal > 0
+      ? `${firstAgeVal}岁${lastAgeVal}月`
+      : `${firstAgeVal}岁`;
+  }
+  if (ageType === 2) {
+    return lastAgeVal > 0
+      ? `${firstAgeVal}月${lastAgeVal}天`
+      : `${firstAgeVal}月`;
+  }
+  return `${firstAgeVal}天`;
+};
+
+const buildPatientPayload = (formData: any) => {
+  const firstAge = formData.firstAge != null ? Number(formData.firstAge) : null;
+  const lastAge = formData.lastAge != null ? Number(formData.lastAge) : null;
+  const ageType =
+    formData.ageType != null
+      ? Number(formData.ageType)
+      : registrationForm.ageType;
+
+  return {
+    id:
+      formData.id ??
+      patientBasicInfoRef.value?.form?.id ??
+      Number(registrationForm.patientId),
+    name: formData.name || "",
+    gender: formData.gender || "",
+    mobile: formData.mobile || "",
+    idCard: formData.idCard || "",
+    age: buildAgeText(firstAge, lastAge, ageType),
+    firstAge,
+    lastAge,
+    ageType,
+    province: formData.province ?? null,
+    city: formData.city ?? null,
+    district: formData.district ?? null,
+    address: formData.address || "",
+    height: normalizeOptionalNumber(formData.height),
+    weight: normalizeOptionalNumber(formData.weight),
+    isAllergy: formData.isAllergy === true,
+    allergicHistory: formData.allergicHistory || ""
+  };
+};
+
 // 选择患者时自动填充信息并锁定患者信息字段
 const handlePatientChange = (value: any) => {
   // 注意：patientName 已通过 v-model 自动更新，无需在此重复设置
@@ -228,45 +286,16 @@ const handlePatientSave = async (formData: any) => {
   registrationForm.gender = formData.gender === "男" ? 1 : 0;
   registrationForm.contact = formData.mobile || "";
   registrationForm.idCard = formData.idCard || "";
-  registrationForm.firstAge = formData.firstAge != null ? Number(formData.firstAge) : 0;
-  registrationForm.lastAge = formData.lastAge != null ? Number(formData.lastAge) : 0;
-  registrationForm.ageType = formData.ageType != null ? Number(formData.ageType) : 1;
-
-  const ageYear = formData.firstAge != null ? Number(formData.firstAge) : null;
-  const ageMonth = formData.lastAge != null ? Number(formData.lastAge) : null;
-  const ageType = registrationForm.ageType;
-  const ageYearVal = ageYear ?? 0;
-  const ageMonthVal = ageMonth ?? 0;
-  let ageStr = `${ageYearVal}岁`;
-  if (ageType === 1) {
-    ageStr = ageMonthVal > 0 ? `${ageYearVal}岁${ageMonthVal}月` : `${ageYearVal}岁`;
-  } else if (ageType === 2) {
-    ageStr = ageMonthVal > 0 ? `${ageYearVal}月${ageMonthVal}天` : `${ageYearVal}月`;
-  } else {
-    ageStr = `${ageMonthVal}天`;
-  }
+  registrationForm.firstAge =
+    formData.firstAge != null ? Number(formData.firstAge) : 0;
+  registrationForm.lastAge =
+    formData.lastAge != null ? Number(formData.lastAge) : 0;
+  registrationForm.ageType =
+    formData.ageType != null ? Number(formData.ageType) : 1;
 
   loading.value = true;
   try {
-    await updateVisitPatientApi({
-      id:
-        patientBasicInfoRef.value?.form?.id ??
-        Number(registrationForm.patientId),
-      name: formData.name || "",
-      gender: formData.gender || "",
-      mobile: formData.mobile || "",
-      idCard: formData.idCard || "",
-      age: ageStr,
-      firstAge: ageYear,
-      lastAge: ageMonth,
-      ageType,
-      province: formData.province ?? null,
-      city: formData.city ?? null,
-      district: formData.district ?? null,
-      address: formData.address || "",
-      isAllergy: formData.isAllergy === true,
-      allergicHistory: formData.allergicHistory || ""
-    } as any);
+    await updateVisitPatientApi(buildPatientPayload(formData) as any);
     ElMessage.success("患者信息已保存");
   } catch (e: any) {
     ElMessage.error(e?.message ?? "保存失败，请重试");
@@ -329,52 +358,59 @@ const handleRegistration = async () => {
 
   // 以 BasicInfo 表单的当前值为准（用户填写的实际值），registrationForm 作为兜底
   const basicInfoForm = patientBasicInfoRef.value?.form;
-  const firstAge = basicInfoForm?.firstAge != null ? Number(basicInfoForm.firstAge) : Number(registrationForm.firstAge);
-  const lastAge = basicInfoForm?.lastAge != null ? Number(basicInfoForm.lastAge) : Number(registrationForm.lastAge);
+  const firstAge =
+    basicInfoForm?.firstAge != null
+      ? Number(basicInfoForm.firstAge)
+      : Number(registrationForm.firstAge);
+  const lastAge =
+    basicInfoForm?.lastAge != null
+      ? Number(basicInfoForm.lastAge)
+      : Number(registrationForm.lastAge);
   const ageType = basicInfoForm?.ageType ?? registrationForm.ageType;
-
-  let ageStr: string;
-  if (ageType === 1) {
-    // 岁 + 月
-    ageStr = lastAge > 0 ? `${firstAge}岁${lastAge}月` : `${firstAge}岁`;
-  } else if (ageType === 2) {
-    // 月 + 天
-    ageStr = lastAge > 0 ? `${firstAge}月${lastAge}天` : `${firstAge}月`;
-  } else {
-    ageStr = `${firstAge}岁`;
-  }
-
-  let patientId = registrationForm.patientId;
-  if (!patientId) {
-    // 如果患者Id不存在，则创建患者
-    const res = await saveVisitPatientApi(patientBasicInfoRef.value.form);
-    if (res.code == 0) {
-      handlePatientChange(res.data);
-      patientId = res.data.id;
-    } else {
-      ElMessage.error("创建患者失败，请重试");
-      return;
-    }
-  }
-
-  const dto: BQRegistrationSaveDto = {
-    registration: {
-      patientId: patientId,
-      patient: registrationForm.patientName,
-      gender: registrationForm.gender === 1 ? "男" : "女",
-      firstAge,
-      lastAge,
-      ageType,
-      department: deptLabel,
-      doctor: doctorLabel,
-      outpatientType: itemLabel,
-      status: "待接诊",
-      isFirstVisit: registrationForm.visitType === 1
-    }
-  };
 
   loading.value = true;
   try {
+    let patientId = registrationForm.patientId;
+    if (!patientId) {
+      // 如果患者Id不存在，则创建患者
+      const res = await saveVisitPatientApi(patientBasicInfoRef.value.form);
+      if (res.code == 0) {
+        handlePatientChange(res.data);
+        patientId = res.data.id;
+      } else {
+        ElMessage.error("创建患者失败，请重试");
+        return;
+      }
+    } else {
+      const patientPayload = buildPatientPayload({
+        ...basicInfoForm,
+        id: patientId,
+        firstAge,
+        lastAge,
+        ageType
+      });
+      await updateVisitPatientApi(patientPayload as any);
+    }
+
+    const dto: BQRegistrationSaveDto = {
+      registration: {
+        patientId: patientId,
+        patient: registrationForm.patientName,
+        gender: registrationForm.gender === 1 ? "男" : "女",
+        firstAge,
+        lastAge,
+        ageType,
+        age: buildAgeText(firstAge, lastAge, ageType),
+        height: normalizeOptionalNumber(basicInfoForm?.height),
+        weight: normalizeOptionalNumber(basicInfoForm?.weight),
+        department: deptLabel,
+        doctor: doctorLabel,
+        outpatientType: itemLabel,
+        status: "待接诊",
+        isFirstVisit: registrationForm.visitType === 1
+      }
+    };
+
     await saveRegistrationApi(dto);
     ElMessage.success("挂号收费成功！");
     handleReset();

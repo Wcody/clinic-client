@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import Refresh from "@iconify-icons/ep/refresh";
 import Plus from "@iconify-icons/ep/plus";
 import { PureTableBar } from "@/components/RePureTableBar";
@@ -25,6 +25,11 @@ import {
   getMedicalDictionaryListApi,
   type BQMedicalDictionaryEntityType
 } from "@/api/cm/medicalDictionary";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({
   name: "ProjectMedicineIndex"
@@ -34,6 +39,7 @@ const tableRef = ref();
 const contentRef = ref();
 const queryFormRef = ref();
 const loading = ref(false);
+const isPlatformTenant = useIsPlatformTenant();
 
 const queryForm = reactive({
   keyword: "",
@@ -157,7 +163,7 @@ const dialogTitle = ref("新增");
 const medicineFormRef = ref<FormInstance>();
 
 const defaultMedicineForm = () => ({
-  id: null,
+  id: undefined as number | undefined,
   type: 1, // 默认西药(type=1)
   status: true,
   name: "",
@@ -183,7 +189,8 @@ const defaultMedicineForm = () => ({
   unitId: undefined as number | undefined,
   useWay: undefined as string | undefined,
   frequency: undefined as string | undefined,
-  decoWay: undefined as string | undefined
+  decoWay: undefined as string | undefined,
+  tenantInitData: true
 });
 
 const medicineForm = reactive(defaultMedicineForm());
@@ -202,6 +209,10 @@ const columns: TableColumnList = [
   { label: "状态", prop: "status", minWidth: 100, formatter: (row: BQDrugEntityType) => row.status ? "已启用" : "已禁用" },
   { label: "操作", fixed: "right", width: 200, slot: "operation" }
 ];
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value ? withTenantInitDataColumn(columns) : columns;
+});
 
 const dataList = ref<BQDrugEntityType[]>([]);
 
@@ -315,8 +326,10 @@ const handleSubmit = async () => {
           useWay: medicineForm.useWay || "",
           frequency: medicineForm.frequency || "",
           status: medicineForm.status,
-          decoWay: medicineForm.decoWay || ""
+          decoWay: medicineForm.decoWay || "",
+          tenantInitData: medicineForm.tenantInitData
         };
+        applyTenantInitDataGuard(submitData);
 
         // 设置药品类型
         submitData.type = medicineForm.type;
@@ -381,6 +394,7 @@ const handleEdit = (row: BQDrugEntityType) => {
   medicineForm.useWay = nameToId(useWayRaw.value, row.useWay);
   medicineForm.frequency = nameToId(frequencyRaw.value, row.frequency);
   medicineForm.decoWay = nameToId(decoWayRaw.value, row.decoWay) ?? "";
+  medicineForm.tenantInitData = row.tenantInitData ?? true;
 
   dialogVisible.value = true;
 };
@@ -394,10 +408,11 @@ const handleToggleStatus = async (row: BQDrugEntityType) => {
       type: "warning"
     });
 
-    const res = await updateDrugApi({
+    const res = await updateDrugApi(applyTenantInitDataGuard({
       id: row.id,
-      status: !row.status
-    });
+      status: !row.status,
+      tenantInitData: row.tenantInitData
+    }));
 
     if (res.code === 0) {
       ElMessage.success(`${action}成功`);
@@ -515,7 +530,7 @@ onMounted(() => {
           :class="['w-full']"
           style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
           title="药品列表"
-          :columns="columns"
+          :columns="tableColumns"
           @refresh="handleQuery"
         >
           <template #buttons>
@@ -868,6 +883,20 @@ onMounted(() => {
                 placeholder=""
                 class="w-full"
                 value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="isPlatformTenant" :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="租户初始化数据" label-width="120px">
+              <el-switch
+                v-model="medicineForm.tenantInitData"
+                inline-prompt
+                :active-value="true"
+                :inactive-value="false"
+                active-text="是"
+                inactive-text="否"
               />
             </el-form-item>
           </el-col>

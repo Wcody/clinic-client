@@ -54,11 +54,16 @@ export function useParam(tableRef: Ref, treeRef: Ref) {
       minWidth: 130,
       cellRenderer: ({ row, props }) => {
         if (row.paramType == 3) {
-          return (
+          const imagePath = row.paramValue?.fileList?.[0];
+          return imagePath ? (
             <img
               class="h-[24px]"
-              src={"ams/mvc/v1/download/images" + row.paramValue?.fileList[0]}
+              src={"ams/mvc/v1/download/images" + imagePath}
             />
+          ) : (
+            <el-tag size={props.size} type="info" effect="plain">
+              未设置
+            </el-tag>
           );
         } else if ([4, 5, 6, 7].includes(row.paramType)) {
           return <el-tag size={props.size}>数据集合</el-tag>;

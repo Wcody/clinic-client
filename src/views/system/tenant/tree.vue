@@ -79,7 +79,7 @@ function toggleRowExpansionAll(status) {
   }
 }
 
-/** 重置租组树状态（选中状态、搜索框值、树初始化） */
+/** 重置诊所管理组树状态（选中状态、搜索框值、树初始化） */
 function onTreeReset() {
   highlightMap.value = {};
   searchValue.value = "";
@@ -104,7 +104,7 @@ defineExpose({ onTreeReset });
         v-model="searchValue"
         class="ml-2"
         size="small"
-        placeholder="请输入租组名称"
+        placeholder="请输入诊所管理组名称"
         clearable
       >
         <template #suffix>

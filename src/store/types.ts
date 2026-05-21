@@ -47,4 +47,5 @@ export type userType = {
   loginDay?: number;
   tenantLogo: string;
   tenantName: string;
+  tenantId: string;
 };

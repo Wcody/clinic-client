@@ -40,7 +40,7 @@ const switchToForm = () => {
 
 // ==================== 新增出库 Tab ====================
 const outboundForm = reactive({
-  operator: "曾俊华",
+  operator: "",
   outboundType: "领用出库",
   items: [] as any[]
 });
@@ -144,15 +144,15 @@ const recordColumns: TableColumnList = [
 ];
 
 const recordList = ref<any[]>([
-  {
-    id: "1",
-    serialNo: "001",
-    orderNo: "2604121826727232",
-    outboundTime: "2026-04-12",
-    amount: "0.30元",
-    outboundType: "领用出库",
-    operator: "曾俊华"
-  }
+  // {
+  //   id: "1",
+  //   serialNo: "001",
+  //   orderNo: "2604121826727232",
+  //   outboundTime: "2026-04-12",
+  //   amount: "0.30元",
+  //   outboundType: "领用出库",
+  //   operator: "曾俊华"
+  // }
 ]);
 
 const recordPagination = reactive({

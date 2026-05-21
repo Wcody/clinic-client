@@ -14,6 +14,11 @@ import {
   type BQBasicSettingEntityType,
   getBasicSettingEntityDefault
 } from "@/api/system/setting";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({ name: "SettingBasic" });
 
@@ -27,6 +32,7 @@ const tabs = [
   { key: "allergy", label: "过敏史" }
 ];
 const activeTab = ref("usage");
+const isPlatformTenant = useIsPlatformTenant();
 
 // ── 当前页签配置 ──────────────────────────────────────────
 const currentTab = computed(() => tabs.find(t => t.key === activeTab.value));
@@ -61,9 +67,12 @@ const commonColumns = ref<any>([
   { label: "操作", fixed: "right", width: 180, slot: "operation" }
 ]);
 
-const columns = computed(() =>
-  isUsageTab.value ? usageColumns.value : commonColumns.value
-);
+const columns = computed(() => {
+  const currentColumns = isUsageTab.value ? usageColumns.value : commonColumns.value;
+  return isPlatformTenant.value
+    ? withTenantInitDataColumn(currentColumns)
+    : currentColumns;
+});
 
 // ── 数据列表 ──────────────────────────────────────────────
 const dataList = ref<BQBasicSettingEntityType[]>([]);
@@ -186,7 +195,7 @@ const handleSave = async () => {
     if (!valid) return;
 
     const api = isEdit.value ? updateBasicSettingApi : addBasicSettingApi;
-    const res = await api(itemForm);
+    const res = await api(applyTenantInitDataGuard({ ...itemForm }));
     if (res.code === 0) {
       ElMessage.success(isEdit.value ? "编辑成功" : "新建成功");
       dialogVisible.value = false;
@@ -359,6 +368,21 @@ onMounted(() => {
             v-model.number="itemForm.seq"
             :min="1"
             style="width: 100%"
+          />
+        </el-form-item>
+
+        <el-form-item
+          v-if="isPlatformTenant"
+          label="租户初始化数据"
+          label-width="120px"
+        >
+          <el-switch
+            v-model="itemForm.tenantInitData"
+            inline-prompt
+            :active-value="true"
+            :inactive-value="false"
+            active-text="是"
+            inactive-text="否"
           />
         </el-form-item>
       </el-form>

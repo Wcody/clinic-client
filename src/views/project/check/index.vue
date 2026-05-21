@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import Refresh from "@iconify-icons/ep/refresh";
 import Plus from "@iconify-icons/ep/plus";
 import { PureTableBar } from "@/components/RePureTableBar";
@@ -21,6 +21,11 @@ import {
   getExamineItemEntityDefault
 } from "@/api/pharmacy/examine";
 import { BQSearchFilter } from "@/api/api";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({
   name: "ProjectCheckIndex"
@@ -30,6 +35,7 @@ const tableRef = ref();
 const contentRef = ref();
 const queryFormRef = ref();
 const loading = ref(false);
+const isPlatformTenant = useIsPlatformTenant();
 
 const queryForm = reactive({
   name: "",
@@ -50,6 +56,10 @@ const columns: TableColumnList = [
   { label: "状态", prop: "status", minWidth: 100 },
   { label: "操作", fixed: "right", width: 160, slot: "operation" }
 ];
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value ? withTenantInitDataColumn(columns) : columns;
+});
 
 const dataList = ref<BQExamineItemEntityType[]>([]);
 
@@ -127,11 +137,13 @@ const dialogTitle = ref("新增");
 const checkFormRef = ref<FormInstance>();
 
 const defaultCheckForm = () => ({
-  id: "",
+  id: undefined as number | undefined,
   name: "",
   sellingPrice: "",
   costPrice: "",
-  status: "启用"
+  status: "启用",
+  isExecProject: false,
+  tenantInitData: true
 });
 
 const checkForm = reactive(defaultCheckForm());
@@ -157,8 +169,11 @@ const handleSubmit = async () => {
           name: checkForm.name,
           sellingPrice: checkForm.sellingPrice,
           costPrice: checkForm.costPrice,
-          status: checkForm.status
+          status: checkForm.status,
+          isExecProject: checkForm.isExecProject,
+          tenantInitData: checkForm.tenantInitData
         };
+        applyTenantInitDataGuard(submitData);
 
         let res;
         if (dialogTitle.value === "新增") {
@@ -198,6 +213,8 @@ const handleEdit = (row: BQExamineItemEntityType) => {
   checkForm.sellingPrice = row.sellingPrice || "";
   checkForm.costPrice = row.costPrice || "";
   checkForm.status = row.status || "启用";
+  checkForm.isExecProject = row.isExecProject ?? false;
+  checkForm.tenantInitData = row.tenantInitData ?? true;
   dialogVisible.value = true;
 };
 
@@ -211,10 +228,11 @@ const handleToggleStatus = async (row: BQExamineItemEntityType) => {
     });
 
     const newStatus = row.status === "启用" ? "禁用" : "启用";
-    const res = await updateExamineItemApi({
+    const res = await updateExamineItemApi(applyTenantInitDataGuard({
       id: row.id,
-      status: newStatus
-    });
+      status: newStatus,
+      tenantInitData: row.tenantInitData
+    }));
 
     if (res.code === 0) {
       ElMessage.success(`${action}成功`);
@@ -290,7 +308,7 @@ onMounted(() => {
         :class="['w-full']"
         style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
         title="检查检验项目列表"
-        :columns="columns"
+        :columns="tableColumns"
         @refresh="handleQuery"
       >
         <template #buttons>
@@ -381,6 +399,16 @@ onMounted(() => {
       </el-form-item>
       <el-form-item label="">
         <el-checkbox v-model="checkForm.isExecProject">执行项目</el-checkbox>
+      </el-form-item>
+      <el-form-item v-if="isPlatformTenant" label="租户初始化数据">
+        <el-switch
+          v-model="checkForm.tenantInitData"
+          inline-prompt
+          :active-value="true"
+          :inactive-value="false"
+          active-text="是"
+          inactive-text="否"
+        />
       </el-form-item>
     </el-form>
     <template #footer>

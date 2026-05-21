@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, computed, onMounted } from "vue";
 import Refresh from "@iconify-icons/ep/refresh";
 import Plus from "@iconify-icons/ep/plus";
 import { PureTableBar } from "@/components/RePureTableBar";
@@ -16,6 +16,11 @@ import {
   getTreatmentItemEntityDefault
 } from "@/api/pharmacy/treatment";
 import { BQSearchFilter } from "@/api/api";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({
   name: "ProjectTreatIndex"
@@ -25,6 +30,7 @@ const tableRef = ref();
 const contentRef = ref();
 const queryFormRef = ref();
 const loading = ref(false);
+const isPlatformTenant = useIsPlatformTenant();
 
 const queryForm = reactive({
   name: "",
@@ -45,6 +51,10 @@ const columns: TableColumnList = [
   { label: "状态", prop: "status", minWidth: 100 },
   { label: "操作", fixed: "right", width: 160, slot: "operation" }
 ];
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value ? withTenantInitDataColumn(columns) : columns;
+});
 
 const dataList = ref<BQTreatmentItemEntityType[]>([]);
 
@@ -116,11 +126,13 @@ const dialogTitle = ref("新增");
 const treatFormRef = ref<FormInstance>();
 
 const defaultTreatForm = () => ({
-  id: "",
+  id: undefined as number | undefined,
   name: "",
   sellingPrice: "",
   costPrice: "",
-  status: "启用"
+  status: "启用",
+  isExecProject: false,
+  tenantInitData: true
 });
 
 const treatForm = reactive(defaultTreatForm());
@@ -146,8 +158,11 @@ const handleSubmit = async () => {
           name: treatForm.name,
           sellingPrice: treatForm.sellingPrice,
           costPrice: treatForm.costPrice,
-          status: treatForm.status
+          status: treatForm.status,
+          isExecProject: treatForm.isExecProject,
+          tenantInitData: treatForm.tenantInitData
         };
+        applyTenantInitDataGuard(submitData);
         
         let res;
         if (dialogTitle.value === "新增") {
@@ -185,6 +200,8 @@ const handleEdit = (row: BQTreatmentItemEntityType) => {
   treatForm.sellingPrice = row.sellingPrice || "";
   treatForm.costPrice = row.costPrice || "";
   treatForm.status = row.status || "启用";
+  treatForm.isExecProject = row.isExecProject ?? false;
+  treatForm.tenantInitData = row.tenantInitData ?? true;
   dialogVisible.value = true;
 };
 
@@ -198,10 +215,11 @@ const handleToggleStatus = async (row: BQTreatmentItemEntityType) => {
     });
     
     const newStatus = row.status === "启用" ? "禁用" : "启用";
-    const res = await updateTreatmentItemApi({
+    const res = await updateTreatmentItemApi(applyTenantInitDataGuard({
       id: row.id,
-      status: newStatus
-    });
+      status: newStatus,
+      tenantInitData: row.tenantInitData
+    }));
     
     if (res.code === 0) {
       ElMessage.success(`${action}成功`);
@@ -277,7 +295,7 @@ onMounted(() => {
         :class="['w-full']"
         style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
         title="治疗项目列表"
-        :columns="columns"
+        :columns="tableColumns"
         @refresh="handleQuery"
       >
         <template #buttons>
@@ -368,6 +386,16 @@ onMounted(() => {
       </el-form-item>
       <el-form-item label="">
         <el-checkbox v-model="treatForm.isExecProject">执行项目</el-checkbox>
+      </el-form-item>
+      <el-form-item v-if="isPlatformTenant" label="租户初始化数据">
+        <el-switch
+          v-model="treatForm.tenantInitData"
+          inline-prompt
+          :active-value="true"
+          :inactive-value="false"
+          active-text="是"
+          inactive-text="否"
+        />
       </el-form-item>
     </el-form>
     <template #footer>

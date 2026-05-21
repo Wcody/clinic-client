@@ -15,6 +15,11 @@ import {
   type BQRegistrationFeeEntityType,
   getRegistrationFeeEntityDefault
 } from "@/api/system/setting";
+import {
+  applyTenantInitDataGuard,
+  useIsPlatformTenant,
+  withTenantInitDataColumn
+} from "@/utils/tenantInitData";
 
 defineOptions({
   name: "RegistrationFeeManagement"
@@ -27,6 +32,7 @@ const dialogTitle = ref("添加挂号项");
 const loading = ref(false);
 const nameInputRef = ref<HTMLInputElement>();
 const formRef = ref<FormInstance>();
+const isPlatformTenant = useIsPlatformTenant();
 
 // 表单验证规则
 const formRules = reactive<FormRules>({
@@ -80,6 +86,12 @@ const columns = ref<any>([
   { label: "成本价", prop: "costPrice", minWidth: 150, slot: "costPrice" },
   { label: "操作", fixed: "right", width: 150, slot: "operation" }
 ]);
+
+const tableColumns = computed(() => {
+  return isPlatformTenant.value
+    ? withTenantInitDataColumn(columns.value)
+    : columns.value;
+});
 
 // 数据列表
 const dataList = ref<BQRegistrationFeeEntityType[]>([]);
@@ -150,7 +162,7 @@ const handleSave = async () => {
     if (!valid) return;
 
     const api = feeForm.id ? updateRegistrationFeeApi : addRegistrationFeeApi;
-    const res = await api(feeForm);
+    const res = await api(applyTenantInitDataGuard({ ...feeForm }));
     if (res.code === 0) {
       ElMessage.success(
         dialogTitle.value === "添加挂号项" ? "添加成功" : "编辑成功"
@@ -176,7 +188,7 @@ const handleToggleStatus = async (row: BQRegistrationFeeEntityType) => {
       type: "warning"
     });
 
-    const updatedRow = { ...row, status: !row.status };
+    const updatedRow = applyTenantInitDataGuard({ ...row, status: !row.status });
     const res = await updateRegistrationFeeApi(updatedRow);
     if (res.code === 0) {
       row.status = !row.status;
@@ -200,12 +212,18 @@ const handleSetDefault = async (row: BQRegistrationFeeEntityType) => {
     // 先取消其他默认项
     const promises = dataList.value
       .filter(item => item.isDefault && item.id !== row.id)
-      .map(item => updateRegistrationFeeApi({ ...item, isDefault: false }));
+      .map(item =>
+        updateRegistrationFeeApi(
+          applyTenantInitDataGuard({ ...item, isDefault: false })
+        )
+      );
 
     await Promise.all(promises);
 
     // 设置当前项为默认
-    const res = await updateRegistrationFeeApi({ ...row, isDefault: true });
+    const res = await updateRegistrationFeeApi(
+      applyTenantInitDataGuard({ ...row, isDefault: true })
+    );
     if (res.code === 0) {
       dataList.value.forEach(item => {
         item.isDefault = item.id === row.id;
@@ -238,7 +256,7 @@ onMounted(() => {
         :class="['w-full']"
         style="transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1)"
         title="挂号费管理"
-        :columns="columns"
+        :columns="tableColumns"
         @refresh="handleQuery"
       >
         <template #buttons>
@@ -359,6 +377,20 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="设为默认">
           <el-switch v-model="feeForm.isDefault" />
+        </el-form-item>
+        <el-form-item
+          v-if="isPlatformTenant"
+          label="租户初始化数据"
+          label-width="120px"
+        >
+          <el-switch
+            v-model="feeForm.tenantInitData"
+            inline-prompt
+            :active-value="true"
+            :inactive-value="false"
+            active-text="是"
+            inactive-text="否"
+          />
         </el-form-item>
       </el-form>
       <template #footer>

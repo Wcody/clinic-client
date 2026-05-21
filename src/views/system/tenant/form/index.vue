@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import ReCol from "@/components/ReCol";
 import { formRules } from "../utils/rule";
 import { FormProps } from "../utils/types";
 import { usePublicHooks } from "../../../hooks";
 import { getTenantEntityDefault } from "@/api/system/tenant";
-import { fa } from "element-plus/es/locales.mjs";
+import { authTypeOptions } from "@/utils/dataconst";
+import { transformI18n } from "@/plugins/i18n";
 
 const props = withDefaults(defineProps<FormProps>(), {
   formInline: () => ({
@@ -18,6 +19,18 @@ const props = withDefaults(defineProps<FormProps>(), {
 const ruleFormRef = ref();
 const { switchStyle } = usePublicHooks();
 const newFormInline = ref(props.formInline);
+const treeProps = {
+  value: "eid",
+  label: "title",
+  children: "children"
+};
+const selectedMenuCount = computed(
+  () => newFormInline.value.menuIds?.length ?? 0
+);
+
+function onMenuCheck(_data, checkedInfo) {
+  newFormInline.value.menuIds = checkedInfo.checkedKeys || [];
+}
 
 function getRef() {
   return ruleFormRef.value;
@@ -35,12 +48,25 @@ defineExpose({ getRef });
     style="max-height: 80vh; overflow-y: auto"
   >
     <el-row>
+      <re-col :value="24" :xs="24" :sm="24">
+        <el-form-item label="授权类型" prop="authType">
+          <el-radio-group v-model="newFormInline.authType">
+            <el-radio
+              v-for="(item, index) in authTypeOptions"
+              :key="index"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </re-col>
       <re-col :value="12" :xs="24" :sm="24">
         <el-form-item label="诊所名称" prop="name">
           <el-input
             v-model="newFormInline.name"
             clearable
-            placeholder="请输入登录账号"
+            placeholder="请输入诊所名称"
           />
         </el-form-item>
       </re-col>
@@ -49,7 +75,7 @@ defineExpose({ getRef });
           <el-input
             v-model="newFormInline.principal"
             clearable
-            placeholder="请输入用户姓名"
+            placeholder="请输入负责人"
           />
         </el-form-item>
       </re-col>
@@ -71,7 +97,7 @@ defineExpose({ getRef });
           />
         </el-form-item>
       </re-col>
-      <re-col v-if="false" :value="12" :xs="24" :sm="24">
+      <re-col :value="12" :xs="24" :sm="24">
         <el-form-item label="最大用户数" prop="maxUserCount">
           <el-input-number
             v-model="newFormInline.maxUserCount"
@@ -91,20 +117,20 @@ defineExpose({ getRef });
           />
         </el-form-item>
       </re-col>
-      <re-col v-if="false" :value="12" :xs="24" :sm="24">
-        <el-form-item label="失效日期1" prop="expireDate">
+      <re-col :value="12" :xs="24" :sm="24">
+        <el-form-item label="截止日期" prop="expireDate">
           <el-date-picker
             v-model="newFormInline.expireDate"
-            type="date"
+            type="datetime"
             class="!w-full"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="请选择截止日期"
           />
         </el-form-item>
       </re-col>
       <re-col :value="12" :xs="24" :sm="24">
-        <el-form-item label="归属租组">
+        <el-form-item label="归属诊所管理组">
           <el-cascader
             v-model="newFormInline.parentId"
             class="w-full"
@@ -117,13 +143,71 @@ defineExpose({ getRef });
             }"
             clearable
             filterable
-            placeholder="请选择归属租组"
+            placeholder="请选择归属诊所管理组"
           >
             <template #default="{ node, data }">
               <span>{{ data.name }}</span>
               <span v-if="!node.isLeaf"> ({{ data.children.length }}) </span>
             </template>
           </el-cascader>
+        </el-form-item>
+      </re-col>
+      <template v-if="newFormInline.title !== '新增'">
+        <re-col :value="8" :xs="24" :sm="24">
+          <el-form-item label="当前用户数">
+            <el-input-number
+              :model-value="newFormInline.currentUserCount ?? 0"
+              class="!w-full"
+              disabled
+              controls-position="right"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="8" :xs="24" :sm="24">
+          <el-form-item label="管理员数">
+            <el-input-number
+              :model-value="newFormInline.adminCount ?? 0"
+              class="!w-full"
+              disabled
+              controls-position="right"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="8" :xs="24" :sm="24">
+          <el-form-item label="菜单授权数">
+            <el-input-number
+              :model-value="newFormInline.menuCount ?? 0"
+              class="!w-full"
+              disabled
+              controls-position="right"
+            />
+          </el-form-item>
+        </re-col>
+      </template>
+      <re-col>
+        <el-form-item label="菜单授权">
+          <div
+            class="w-full rounded-[4px] border border-[var(--el-border-color)]"
+          >
+            <div
+              class="flex items-center justify-between border-b border-[var(--el-border-color)] px-3 py-2 text-sm text-[var(--el-text-color-secondary)]"
+            >
+              <span>已选 {{ selectedMenuCount }} 项</span>
+            </div>
+            <el-tree-v2
+              show-checkbox
+              :data="newFormInline.menuOptions"
+              :props="treeProps"
+              :height="260"
+              :check-strictly="false"
+              :default-checked-keys="newFormInline.menuIds"
+              @check="onMenuCheck"
+            >
+              <template #default="{ node }">
+                <span>{{ transformI18n(node.label) }}</span>
+              </template>
+            </el-tree-v2>
+          </div>
         </el-form-item>
       </re-col>
       <re-col
@@ -144,6 +228,54 @@ defineExpose({ getRef });
           />
         </el-form-item>
       </re-col>
+      <template v-if="newFormInline.title === '新增'">
+        <re-col :value="12" :xs="24" :sm="24">
+          <el-form-item label="初始管理员账号" prop="adminAccount">
+            <el-input
+              v-model="newFormInline.adminAccount"
+              clearable
+              placeholder="请输入初始管理员账号"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="12" :xs="24" :sm="24">
+          <el-form-item label="初始管理员密码" prop="adminPassword">
+            <el-input
+              v-model="newFormInline.adminPassword"
+              clearable
+              show-password
+              placeholder="请输入初始管理员密码"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="12" :xs="24" :sm="24">
+          <el-form-item label="管理员姓名" prop="adminName">
+            <el-input
+              v-model="newFormInline.adminName"
+              clearable
+              placeholder="默认使用负责人或账号"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="12" :xs="24" :sm="24">
+          <el-form-item label="管理员手机号" prop="adminPhone">
+            <el-input
+              v-model="newFormInline.adminPhone"
+              clearable
+              placeholder="默认使用诊所手机号"
+            />
+          </el-form-item>
+        </re-col>
+        <re-col :value="12" :xs="24" :sm="24">
+          <el-form-item label="管理员邮箱" prop="adminEmail">
+            <el-input
+              v-model="newFormInline.adminEmail"
+              clearable
+              placeholder="默认使用诊所邮箱"
+            />
+          </el-form-item>
+        </re-col>
+      </template>
 
       <re-col>
         <el-form-item label="备注">

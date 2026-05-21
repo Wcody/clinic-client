@@ -70,6 +70,8 @@ export type BQLoginUserEntityType = {
   tenantLogo: string;
   /** 诊所名称 */
   tenantName: string;
+  /** 当前租户ID */
+  tenantId?: string;
 };
 
 /**
